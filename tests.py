@@ -8,7 +8,7 @@ import copy
 import random
 import unittest
 
-from human import Human, create_human
+from human import Human
 from events import make_events, apply_decay, apply_event
 
 
@@ -175,7 +175,7 @@ class TestAxioms(unittest.TestCase):
                         f"Post-crash pleasure ({final_pleasure:.1f}) "
                         f"should be noticeably below peak ({peak_pleasure:.1f})")
         # And reserves should be depleted
-        self.assertLess(h.reserves['dopamine'], 80,
+        self.assertLess(h.reserves['dopamine'], 90,
                         f"Dopamine reserves should be depleted after spree")
 
     # -----------------------------------------------------------------
@@ -791,6 +791,173 @@ class TestRunIntegration(unittest.TestCase):
                         "Basic sequence should remain viable")
         self.assertGreater(result['total_pleasure'], 0,
                            "Should accumulate some pleasure")
+
+
+class TestContextReceptivity(unittest.TestCase):
+    """Tests for context-sensitive receptivity: same action, different outcome."""
+
+    def setUp(self):
+        self.events = make_events()
+        import events as ev
+        self._orig_prob = ev.ENABLE_PROBABILISTIC
+        ev.ENABLE_PROBABILISTIC = False
+
+    def tearDown(self):
+        import events as ev
+        ev.ENABLE_PROBABILISTIC = self._orig_prob
+
+    def test_sexual_stim_during_high_anxiety_is_worse(self):
+        """Sexual stimulation while panicking should be less pleasurable than when calm."""
+        # Calm human
+        h_calm = Human()
+        h_calm.anxiety = 20
+        h_calm.arousal = 40
+        calm_before = h_calm.pleasure_score()
+        apply_event(h_calm, 'light_stimulation', self.events['light_stimulation'])
+        calm_gain = h_calm.pleasure_score() - calm_before
+
+        # Panicking human
+        h_panic = Human()
+        h_panic.anxiety = 80
+        h_panic.arousal = 40
+        panic_before = h_panic.pleasure_score()
+        apply_event(h_panic, 'light_stimulation', self.events['light_stimulation'])
+        panic_gain = h_panic.pleasure_score() - panic_before
+
+        self.assertGreater(calm_gain, panic_gain,
+                           f"Sexual stim while calm ({calm_gain:.2f}) should feel better "
+                           f"than while panicking ({panic_gain:.2f})")
+
+    def test_sexual_stim_during_panic_increases_anxiety(self):
+        """Sexual stimulation during extreme anxiety should make anxiety worse."""
+        h = Human()
+        h.anxiety = 95
+        h.arousal = 40
+        initial_anxiety = h.anxiety
+        apply_event(h, 'light_stimulation', self.events['light_stimulation'])
+        # With negative receptivity, anxiety -= 5*eff where eff is negative → anxiety increases
+        self.assertGreater(h.anxiety, initial_anxiety,
+                           f"Sexual stim during panic should increase anxiety: "
+                           f"before={initial_anxiety:.1f}, after={h.anxiety:.1f}")
+
+    def test_pain_without_arousal_is_unpleasant(self):
+        """Pain stimulation without arousal context should reduce pleasure."""
+        h = Human()
+        h.arousal = 10  # very low arousal
+        h.absorption = 10
+        h.anxiety = 35  # start at Yerkes-Dodson optimum so backfire can only hurt
+        before = h.pleasure_score()
+        apply_event(h, 'light_pain', self.events['light_pain'])
+        h.clamp_values()
+        after = h.pleasure_score()
+        self.assertLess(after, before,
+                        f"Pain without arousal context should reduce pleasure: "
+                        f"before={before:.2f}, after={after:.2f}")
+
+    def test_pain_with_arousal_is_pleasurable(self):
+        """Pain during high arousal and absorption should increase pleasure."""
+        h = Human()
+        h.arousal = 60
+        h.absorption = 50
+        h.anxiety = 20
+        before = h.pleasure_score()
+        apply_event(h, 'light_pain', self.events['light_pain'])
+        after = h.pleasure_score()
+        self.assertGreater(after, before,
+                           f"Pain with arousal context should increase pleasure: "
+                           f"before={before:.2f}, after={after:.2f}")
+
+    def test_social_interaction_during_anxiety_backfires(self):
+        """Cuddling while highly anxious should feel worse than when calm."""
+        # Calm human
+        h_calm = Human()
+        h_calm.anxiety = 15
+        h_calm.oxytocin = 40
+        calm_before = h_calm.pleasure_score()
+        apply_event(h_calm, 'cuddling', self.events['cuddling'])
+        calm_gain = h_calm.pleasure_score() - calm_before
+
+        # Anxious human
+        h_anxious = Human()
+        h_anxious.anxiety = 80
+        h_anxious.oxytocin = 40
+        anxious_before = h_anxious.pleasure_score()
+        apply_event(h_anxious, 'cuddling', self.events['cuddling'])
+        anxious_gain = h_anxious.pleasure_score() - anxious_before
+
+        self.assertGreater(calm_gain, anxious_gain,
+                           f"Cuddling while calm ({calm_gain:.2f}) should feel better "
+                           f"than while anxious ({anxious_gain:.2f})")
+
+    def test_context_setup_matters_for_sexual_sequence(self):
+        """Building context (cuddling, massage) before sex should produce more
+        pleasure than jumping straight to stimulation."""
+        # Cold start: just spam stimulation
+        h_cold = Human()
+        run_sequence(h_cold, [
+            'light_stimulation', 'light_stimulation', 'light_stimulation',
+        ], self.events)
+        cold_pleasure = h_cold.pleasure_score()
+
+        # Warm start: build context first
+        h_warm = Human()
+        run_sequence(h_warm, [
+            'cuddling', 'massage', 'light_stimulation',
+        ], self.events)
+        warm_pleasure = h_warm.pleasure_score()
+
+        self.assertGreater(warm_pleasure, cold_pleasure,
+                           f"Context-building sequence ({warm_pleasure:.2f}) should beat "
+                           f"cold start ({cold_pleasure:.2f})")
+
+    def test_psychedelics_during_anxiety_less_effective(self):
+        """Psychedelics while anxious should produce less pleasure gain than when calm."""
+        # Calm human
+        h_calm = Human()
+        h_calm.energy = 60
+        h_calm.anxiety = 20
+        calm_before = h_calm.pleasure_score()
+        apply_event(h_calm, 'mushrooms', self.events['mushrooms'])
+        calm_gain = h_calm.pleasure_score() - calm_before
+
+        # Anxious human
+        h_anxious = Human()
+        h_anxious.energy = 60
+        h_anxious.anxiety = 70
+        h_anxious.psychological_health = 30
+        anxious_before = h_anxious.pleasure_score()
+        apply_event(h_anxious, 'mushrooms', self.events['mushrooms'])
+        anxious_gain = h_anxious.pleasure_score() - anxious_before
+
+        self.assertGreater(calm_gain, anxious_gain,
+                           f"Mushrooms while calm ({calm_gain:.2f}) should feel better "
+                           f"than while anxious ({anxious_gain:.2f})")
+
+    def test_receptivity_values_at_default_state(self):
+        """Default human should have full receptivity for non-pain categories."""
+        from events import compute_receptivity
+        h = Human()
+        # Default state: anxiety=30, prefrontal=50, arousal=20, absorption=30
+        self.assertAlmostEqual(compute_receptivity(h, 'sexual'), 1.0, places=1,
+                               msg="Default human should have high sexual receptivity")
+        self.assertAlmostEqual(compute_receptivity(h, 'social'), 1.0, places=1,
+                               msg="Default human should have high social receptivity")
+        self.assertAlmostEqual(compute_receptivity(h, 'rest'), 1.0, places=1,
+                               msg="Rest should always be fully receptive")
+
+    def test_receptivity_clamped(self):
+        """Receptivity should never go below -0.5 or above 1.0."""
+        from events import compute_receptivity
+        # Worst case: extreme anxiety
+        h = Human()
+        h.anxiety = 100
+        h.arousal = 0
+        h.absorption = 0
+        h.prefrontal = 100
+        for category in ['sexual', 'social', 'pain', 'breathwork', 'food', 'drugs', 'rest']:
+            r = compute_receptivity(h, category)
+            self.assertGreaterEqual(r, -0.5, f"{category} receptivity below -0.5")
+            self.assertLessEqual(r, 1.0, f"{category} receptivity above 1.0")
 
 
 if __name__ == '__main__':

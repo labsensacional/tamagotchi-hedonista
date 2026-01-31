@@ -21,11 +21,11 @@ BASELINES = {
     'vasopressin': 20.0,    # active arousal, focus, intensity, dominance
     'arousal': 20.0,
     'prefrontal': 50.0,
+    'absorption': 30.0,     # baseline self-awareness (low absorption)
     'sleepiness': 20.0,     # baseline alertness (low sleepiness)
     'hunger': 50.0,         # hunger increases over time (baseline is "somewhat hungry")
     'energy': 50.0,
     'anxiety': 30.0,        # moderate baseline anxiety (correlates with cortisol)
-    'absorption': 30.0,     # baseline self-awareness (low absorption)
 }
 
 # Decay rate: fraction of distance to baseline recovered per hour
@@ -174,6 +174,121 @@ def nt_boost(human: Human, attr: str, raw_amount: float, is_orgasm: bool = False
         })
 
 
+def compute_receptivity(human: Human, category: str) -> float:
+    """
+    How receptive the human is to this category of event based on current state.
+    Returns -0.5 (backfire) to 1.0 (fully receptive).
+
+    This is the "appraisal/gating" layer: determines whether an action lands well
+    or backfires. Magnitude effects are lighter here since pleasure_score() already
+    handles anxiety/absorption magnitude via Yerkes-Dodson and absorption factor.
+
+    Positive range [0, 1]: gates how much of the event's benefits land.
+    Negative range [-0.5, 0): event backfires — triggers explicit aversive consequences.
+    """
+    r = 1.0
+
+    if category == 'sexual':
+        # High anxiety gates out sexual receptivity
+        if human.anxiety > 50:
+            r -= (human.anxiety - 50) / 50 * 1.2
+        # Overthinking (high prefrontal) reduces receptivity
+        if human.prefrontal > 60:
+            r -= (human.prefrontal - 60) / 40 * 0.3
+        # Existing arousal improves receptivity
+        if human.arousal > 20:
+            r += (human.arousal - 20) / 80 * 0.3
+        # Absorption helps (being in the moment)
+        if human.absorption > 30:
+            r += (human.absorption - 30) / 70 * 0.2
+
+    elif category == 'social':
+        # High anxiety makes socializing aversive
+        if human.anxiety > 50:
+            r -= (human.anxiety - 50) / 50 * 1.2
+        # Low energy makes socializing draining
+        if human.energy < 25:
+            r -= (25 - human.energy) / 25 * 0.4
+        # Existing oxytocin buffers anxiety penalty (feeling connected)
+        if human.oxytocin > 35:
+            r += (human.oxytocin - 35) / 65 * 0.4
+
+    elif category == 'pain':
+        # Pain without arousal context is just pain
+        if human.arousal < 30:
+            r -= (30 - human.arousal) / 30 * 1.8
+        # Absorption helps convert pain to pleasure (play/safety proxy)
+        if human.absorption > 40:
+            r += (human.absorption - 40) / 60 * 0.3
+        # High anxiety makes pain threatening rather than playful
+        if human.anxiety > 55:
+            r -= (human.anxiety - 55) / 45 * 0.5
+
+    elif category == 'breathwork':
+        # Very high anxiety can make breathwork counterproductive (panic)
+        if human.anxiety > 70:
+            r -= (human.anxiety - 70) / 30 * 0.5
+
+    elif category == 'food':
+        # High anxiety reduces food enjoyment
+        if human.anxiety > 60:
+            r -= (human.anxiety - 60) / 40 * 0.3
+
+    elif category == 'drugs':
+        # High anxiety + drugs can go wrong
+        if human.anxiety > 55:
+            r -= (human.anxiety - 55) / 45 * 0.5
+        # Low psychological health makes drug experiences risky
+        if human.psychological_health < 40:
+            r -= (40 - human.psychological_health) / 40 * 0.4
+
+    # 'rest' category: always receptive (r stays 1.0)
+
+    return max(-0.5, min(1.0, r))
+
+
+def apply_backfire(human: Human, category: str, severity: float):
+    """
+    Explicit aversive consequences when an action backfires (negative receptivity).
+    severity is 0..0.5 (the absolute value of negative receptivity).
+
+    Each category has specific backfire dynamics rather than generic sign-flipping.
+    """
+    if category == 'sexual':
+        # Unwanted sexual stimulation during panic → more anxiety, self-consciousness
+        human.anxiety += severity * 20
+        human.absorption -= severity * 15
+        human.prefrontal += severity * 10  # rumination, self-monitoring
+
+    elif category == 'social':
+        # Social interaction while panicking → social anxiety spiral
+        human.anxiety += severity * 25
+        human.absorption -= severity * 10
+        human.prefrontal += severity * 15  # overthinking, rumination
+        human.psychological_health -= severity * 2
+
+    elif category == 'pain':
+        # Pain without arousal/play context → just hurts
+        human.anxiety += severity * 20
+        human.physical_health -= severity * 3
+        human.absorption -= severity * 10
+
+    elif category == 'breathwork':
+        # Breathwork during extreme anxiety → hyperventilation panic
+        human.anxiety += severity * 15
+
+    elif category == 'food':
+        # Eating while very anxious → nausea, discomfort
+        human.anxiety += severity * 10
+        human.digesting += severity * 15
+
+    elif category == 'drugs':
+        # Bad trip / panic on drugs
+        human.anxiety += severity * 30
+        human.psychological_health -= severity * 4
+        human.absorption -= severity * 15
+
+
 def apply_event(human: Human, event_name: str, event: 'Event'):
     """
     Central wrapper that orchestrates tolerance, event application, and tolerance update.
@@ -185,20 +300,34 @@ def apply_event(human: Human, event_name: str, event: 'Event'):
     category = EVENT_CATEGORIES.get(event_name, 'rest')
     tolerance = human.tolerance.get(category, 0.0)
 
-    # Effectiveness: 1.0 at tolerance=0, 0.4 at tolerance=1.0
-    effectiveness = 1.0 - tolerance * 0.6
+    # Tolerance: 1.0 at tolerance=0, 0.4 at tolerance=1.0
+    tolerance_factor = 1.0 - tolerance * 0.6
 
-    # Apply the event with effectiveness
-    event.apply(human, effectiveness)
+    # Context receptivity: -0.5 to 1.0
+    receptivity = compute_receptivity(human, category)
 
-    # Update tolerance
+    if receptivity >= 0:
+        # Normal mode: gate benefits by receptivity and tolerance
+        effectiveness = tolerance_factor * receptivity
+        event.apply(human, effectiveness)
+    else:
+        # Backfire mode: benefits don't land (eff=0), unscaled costs still apply,
+        # plus explicit aversive consequences
+        event.apply(human, 0)
+        apply_backfire(human, category, severity=abs(receptivity))
+
+    # Update tolerance (builds regardless of whether experience was good or bad)
     gain = TOLERANCE_GAINS.get(category, 0.0)
     if gain > 0:
         human.tolerance[category] = min(1.0, human.tolerance.get(category, 0.0) + gain)
 
-    # Cue learning: repeated use increases wanting (dopamine anticipation)
-    salience_gain = gain * 0.5
-    human.cue_salience[category] = min(1.0, human.cue_salience.get(category, 0.0) + salience_gain)
+    # Cue learning: good experiences increase wanting, bad ones decrease it
+    if receptivity >= 0:
+        salience_gain = gain * 0.5
+        human.cue_salience[category] = min(1.0, human.cue_salience.get(category, 0.0) + salience_gain)
+    else:
+        salience_loss = abs(receptivity) * 0.1
+        human.cue_salience[category] = max(0.0, human.cue_salience.get(category, 0.0) - salience_loss)
 
     # Apply cue-driven dopamine boost (wanting increases even as liking decreases)
     cue_dopamine = human.cue_salience.get(category, 0.0) * 2
