@@ -97,6 +97,14 @@ def format_status(human: Human, action: str = None, time: float = 0.0) -> str:
     lines.append(f"  Tiempo: {time:.1f}h | Placer: {pleasure:.1f} | {emoji}")
     lines.append(f"{'='*50}")
 
+    # Traits (only show non-default)
+    trait_parts = [f"T={human.testosterone:.0f}"]
+    if human.ssri_level > 0:
+        trait_parts.append(f"SSRI={human.ssri_level:.0f}")
+    if human.life_stress > 0:
+        trait_parts.append(f"Estrés={human.life_stress:.0f}")
+    lines.append(f"  Rasgos: {', '.join(trait_parts)}")
+
     # Neurotransmitters
     lines.append(f"  Neurotransmisores:")
     lines.append(f"    Dopamina:   {human.dopamine:5.1f} {'█' * int(human.dopamine/5)}")

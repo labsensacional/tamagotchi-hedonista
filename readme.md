@@ -77,50 +77,66 @@ If a refactor breaks a test, it means a theory was violated.
 
 ### Related ideas
 
-- https://docs.google.com/presentation/d/1D18EzWCCm2uJj_vKiyX8DbENNaOz5JuJHXbCjgbvYlI/edit?usp=sharing
+Some useful concepts below. Besides that this [google slide](https://docs.google.com/presentation/d/1D18EzWCCm2uJj_vKiyX8DbENNaOz5JuJHXbCjgbvYlI/edit?usp=sharing) about key ideas of labsensacional.com can be useful.
 
-- missatribution of arousal
-- somatic markers
-- ahegao face
-- mammalian dive reflex (MDR)
-- testo junki and manifiesto contrasexual from preciado
-- Hurts So Good - The Science and Culture of Pain on Purpose (2021) por Leigh Cowart
-- Sexual Secrets - The Alchemy of Ecstasy (1999) - Nik Douglas, Penny Slinger
-- The History of Sexuality by Michel Foucault
-- ericksonian and neuro linguistic programming ideas
-- emotional lability
-- ASMR
-- raves, ecstatic dance, osho dynamic meditations
-- play, games, conversational humour, videogames
-- Visión no binaria: placer/dolor, género, identidad, humano/salvaje 
-- Yoga techniques, lion pose, asanas, paranayamas, tantric energy play, ...
-- self flaggelation techniques from american tribes and fakir mustafa
-- recreative drugs and its effects
-- Shulgin Rating Scale, tihkal, pihkal
-- louis lewin books
-- Orgasmic Yoga ideas from Joseph Kramer, Barbara Carellas and Annie Sprinkle (angergasms, crygasms, laughgasms, ...)
-- runner's high
-- The Erotic Mind: Unlocking the Inner Sources of Passion and Fulfillment – The Psychology of Sexual Arousal, Desire, and Erotic Paradoxes Paperback
-- sensation play
-- sensory isolation
-- Cue learning
-- dopamine is "wanting" not "liking" (Berridge's distinction)
-- Darwin - Expression of emotions book
-- oliver sacks - the man who mistook his wife with a hat
-- kinsey and masters studies
-- Trance level / Hypnotic susceptibility tests (harvard, stanford, ...)
-- sex toys, magic wand, sybian, fuck machines, electro play (e-stim, stim box)
-- multiorgasm, edging
-- breathwork, pranayamas
-- flow states
-- yerkes-dowson curve
-- Peter J. Caroll Gnosis Techniques (excitatory and inhibitory types)
-- C-tactile (CT) fibers
-- Appraisal theory
-- Affect as information hypothesis
-    - misattribution of affect
-- Two-factor theory of emotion
-- Transactional Model of Stress and Coping of Richard Lazarus
+#### Neurophysiology, affect, and embodiment
+- Misattribution of arousal  
+- Somatic markers  
+- Emotional lability  
+- Cue learning  
+- C-tactile (CT) fibers  
+- Runner’s high  
+- Flow states  
+- Yerkes–Dodson curve  
+- Dopamine as “wanting” vs “liking” (Berridge’s distinction)
+
+#### Emotion, cognition, and appraisal theories
+- Appraisal theory  
+- Affect as information hypothesis  
+  - Misattribution of affect  
+- Two-factor theory of emotion  
+- Transactional Model of Stress and Coping (Richard Lazarus)
+
+#### Sensory modulation and altered states
+- ASMR  
+- Sensory isolation  
+- Mammalian dive reflex (MDR)  
+- Trance level / hypnotic susceptibility tests (Harvard, Stanford, etc.)  
+- Peter J. Carroll – Gnosis techniques (excitatory and inhibitory types)
+
+#### Movement, breath, and embodied practices
+- Yoga techniques (lion pose, asanas, pranayamas, tantric energy play, …)  
+- Breathwork / pranayamas  
+- Raves, ecstatic dance, Osho dynamic meditations  
+- Play, games, conversational humour, videogames  
+
+#### Sexuality, erotic practices, and pleasure engineering
+- Ahegao face  
+- Sensation play  
+- Self-flagellation techniques (American tribes; Fakir Mustafa)  
+- Orgasmic Yoga ideas (Joseph Kramer, Barbara Carrellas, Annie Sprinkle: angergasms, crygasms, laughgasms, …)  
+- Multiorgasm, edging  
+- Sex toys (Magic Wand, Sybian, fuck machines, electro-play / e-stim, stim box)
+
+#### Drugs, psychopharmacology, and rating systems
+- Recreational drugs and their effects  
+- Shulgin Rating Scale; TiHKAL; PiHKAL  
+- Louis Lewin (books)
+
+#### Culture, philosophy, and critical frameworks
+- Visión no binaria: placer/dolor, género, identidad, humano/salvaje  
+- Testo Junkie and Manifiesto contrasexual — Paul B. Preciado  
+- Hurts So Good: The Science and Culture of Pain on Purpose (2021) — Leigh Cowart  
+- Sexual Secrets: The Alchemy of Ecstasy (1999) — Nik Douglas, Penny Slinger  
+- The History of Sexuality — Michel Foucault  
+- Ericksonian hypnosis and neuro-linguistic programming (NLP) ideas  
+
+#### Psychology, psychiatry, and sexology (classics)
+- The Erotic Mind: Unlocking the Inner Sources of Passion and Fulfillment — Jack Morin  
+- The Expression of the Emotions in Man and Animals — Charles Darwin  
+- The Man Who Mistook His Wife for a Hat — Oliver Sacks  
+- Kinsey and Masters & Johnson studies
+
 
 
 ## Decisiones de diseño

@@ -1,19 +1,24 @@
 from dataclasses import dataclass, field, fields
 
 
-def create_human(testosterone: float = 50.0) -> 'Human':
+def create_human(testosterone: float = 50.0, ssri_level: float = 0.0,
+                  life_stress: float = 0.0) -> 'Human':
     """
-    Factory function to create a Human with testosterone-adjusted initial values.
+    Factory function to create a Human with trait-adjusted initial values.
     Testosterone (0-100) affects:
     - Baseline arousal: higher T = higher baseline arousal
     - Energy: higher T = slightly more energy
     - Anxiety: higher T = slightly lower baseline anxiety
     - Vasopressin baseline: higher T = higher vasopressin tendency
+    SSRI (0-100) affects serotonin, prolactin, anxiety, dopamine baselines.
+    Life stress (0-100) affects anxiety and absorption baselines.
     """
     t_factor = testosterone / 50.0  # 1.0 at T=50, 0.0 at T=0, 2.0 at T=100
 
     return Human(
         testosterone=testosterone,
+        ssri_level=ssri_level,
+        life_stress=life_stress,
         arousal=15.0 + 10.0 * t_factor,           # 15-35 based on T
         energy=75.0 + 10.0 * t_factor,            # 75-95 based on T
         anxiety=35.0 - 10.0 * t_factor,           # 35-15 based on T (inverse)
@@ -31,6 +36,8 @@ class Human:
     # Testosterone level: affects baseline arousal, energy, dominance tendencies
     # This is a trait, not a state - set once at creation, doesn't change during simulation
     testosterone: float = 50.0   # 0 = very low T, 100 = very high T
+    ssri_level: float = 0.0      # 0-100, psychiatric medication dose
+    life_stress: float = 0.0     # 0-100, background chronic stress
 
     # === NEUROTRANSMITTERS ===
     dopamine: float = 50.0       # reward, motivation, pleasure anticipation
@@ -69,7 +76,8 @@ class Human:
     # === PHYSIOLOGICAL REALISM ===
     tolerance: dict = field(default_factory=lambda: {
         'sexual': 0.0, 'pain': 0.0, 'social': 0.0,
-        'breathwork': 0.0, 'food': 0.0, 'rest': 0.0, 'drugs': 0.0
+        'breathwork': 0.0, 'food': 0.0, 'rest': 0.0, 'drugs': 0.0,
+        'medical': 0.0, 'life': 0.0
     })
     reserves: dict = field(default_factory=lambda: {
         'dopamine': 100.0, 'serotonin': 100.0,
@@ -79,7 +87,8 @@ class Human:
     rebound_queue: list = field(default_factory=list)
     cue_salience: dict = field(default_factory=lambda: {
         'sexual': 0.0, 'pain': 0.0, 'social': 0.0,
-        'breathwork': 0.0, 'food': 0.0, 'rest': 0.0, 'drugs': 0.0
+        'breathwork': 0.0, 'food': 0.0, 'rest': 0.0, 'drugs': 0.0,
+        'medical': 0.0, 'life': 0.0
     })
 
     # Fields excluded from 0-100 clamping (unbounded or non-numeric)
@@ -87,6 +96,7 @@ class Human:
         'time_since_orgasm',  # unbounded time counter
         'tolerance', 'reserves', 'cue_salience',  # dicts, clamped separately
         'active_effects', 'rebound_queue',  # lists, not clamped
+        'ssri_level', 'life_stress',  # traits, not state
     })
 
     def clamp_values(self):
@@ -108,6 +118,19 @@ class Human:
         for k in self.cue_salience:
             self.cue_salience[k] = max(0.0, min(1.0, self.cue_salience[k]))
 
+    def yerkes_dodson_optimum(self) -> float:
+        """
+        Individualized optimal anxiety level for Yerkes-Dodson curve.
+        Base: 35. Modified by testosterone and SSRI.
+        """
+        optimum = 35.0
+        # High T = lower optimum (less anxiety needed for peak performance)
+        optimum -= (self.testosterone - 50) / 50 * 5
+        # SSRI = lower optimum (less anxiety needed)
+        ssri_pct = self.ssri_level / 100.0
+        optimum -= ssri_pct * 8
+        return max(10.0, min(50.0, optimum))
+
     def pleasure_score(self) -> float:
         """
         Composite pleasure score - what we want to maximize.
@@ -121,18 +144,20 @@ class Human:
             self.serotonin * 0.25        # contentment/wellbeing
         )
 
-        # Yerkes-Dodson inverted-U: moderate anxiety (~35) is optimal
-        # Too low = understimulated, too high = overwhelmed
-        if self.anxiety <= 35:
-            # Rising: 0.92 at anxiety=0, 1.05 at anxiety=35
-            anxiety_factor = 0.92 + (self.anxiety / 35) * 0.13
+        # Yerkes-Dodson inverted-U: individualized optimum
+        optimum = self.yerkes_dodson_optimum()
+        if self.anxiety <= optimum:
+            # Rising: 0.92 at anxiety=0, 1.05 at optimum
+            anxiety_factor = 0.92 + (self.anxiety / optimum) * 0.13
         else:
-            # Falling: 1.05 at anxiety=35, 0.60 at anxiety=100
-            anxiety_factor = 1.05 - ((self.anxiety - 35) / 65) * 0.45
+            # Falling: 1.05 at optimum, 0.60 at anxiety=100
+            anxiety_factor = 1.05 - ((self.anxiety - optimum) / (100 - optimum)) * 0.45
 
         # Absorption bonus: high absorption amplifies pleasure
-        # At absorption=100, pleasure is amplified by 30%
-        absorption_factor = 1.0 + (self.absorption / 100) * 0.3
+        # SSRI halves the absorption amplification (emotional blunting)
+        ssri_pct = self.ssri_level / 100.0
+        max_bonus = 0.3 * (1 - ssri_pct * 0.5)
+        absorption_factor = 1.0 + (self.absorption / 100) * max_bonus
 
         return base_pleasure * anxiety_factor * absorption_factor
 
@@ -148,8 +173,13 @@ class Human:
 
     def __repr__(self):
         res = self.reserves
+        traits = f"T={self.testosterone:.0f}"
+        if self.ssri_level > 0:
+            traits += f", SSRI={self.ssri_level:.0f}"
+        if self.life_stress > 0:
+            traits += f", stress={self.life_stress:.0f}"
         return (
-            f"Human(T={self.testosterone:.0f}, dopa={self.dopamine:.1f}, oxy={self.oxytocin:.1f}, "
+            f"Human({traits}, dopa={self.dopamine:.1f}, oxy={self.oxytocin:.1f}, "
             f"vaso={self.vasopressin:.1f}, prol={self.prolactin:.1f}, "
             f"arousal={self.arousal:.1f}, anxiety={self.anxiety:.1f}, "
             f"absorb={self.absorption:.1f}, sleepy={self.sleepiness:.1f}, "

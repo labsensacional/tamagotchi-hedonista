@@ -56,6 +56,8 @@ TOLERANCE_GAINS = {
     'food': 0.05,
     'rest': 0.0,
     'drugs': 0.15,
+    'medical': 0.0,
+    'life': 0.0,
 }
 
 # How fast tolerance decays per hour (toward 0)
@@ -67,6 +69,8 @@ TOLERANCE_DECAY_RATES = {
     'food': 0.15,
     'rest': 0.0,
     'drugs': 0.04,
+    'medical': 0.0,
+    'life': 0.0,
 }
 
 # Reserve constants
@@ -78,6 +82,43 @@ SLEEP_TOLERANCE_REDUCE = 0.15   # how much tolerance drops on sleep
 SUSTAINED_FRACTION = 0.4        # 40% of boost delivered over time
 SUSTAINED_DURATION = 0.25       # hours
 ORGASM_IMMEDIATE_FRACTION = 0.9 # orgasm is 90% immediate, 10% sustained
+
+
+# =============================================================================
+# EFFECTIVE BASELINES (trait-modified)
+# =============================================================================
+
+def get_effective_baselines(human: Human) -> dict:
+    """
+    Return a per-human copy of BASELINES modified by traits (testosterone,
+    SSRI, life stress). Never mutates the shared BASELINES dict.
+    All values clamped to [0, 100].
+    """
+    eb = dict(BASELINES)
+    t_factor = human.testosterone / 50.0 - 1.0  # -1 at T=0, 0 at T=50, +1 at T=100
+    ssri_pct = human.ssri_level / 100.0
+    stress_pct = human.life_stress / 100.0
+
+    # Testosterone effects
+    eb['arousal'] += t_factor * 5
+    eb['vasopressin'] += t_factor * 5
+    eb['anxiety'] -= t_factor * 5
+
+    # SSRI effects
+    eb['serotonin'] += ssri_pct * 15
+    eb['prolactin'] += ssri_pct * 12
+    eb['anxiety'] -= ssri_pct * 10
+    eb['dopamine'] -= ssri_pct * 5
+
+    # Life stress effects
+    eb['anxiety'] += stress_pct * 20
+    eb['absorption'] -= stress_pct * 8
+
+    # Clamp all to [0, 100]
+    for k in eb:
+        eb[k] = max(0.0, min(100.0, eb[k]))
+
+    return eb
 
 
 # =============================================================================
@@ -107,6 +148,11 @@ def nt_boost(human: Human, attr: str, raw_amount: float, is_orgasm: bool = False
     reserve_level = human.reserves[reserve_key]
     scale_factor = 0.15 + 0.85 * (reserve_level / 100.0)
     scaled_amount = raw_amount * scale_factor
+
+    # SSRI dopamine capping: at max SSRI, dopamine boosts are 60% of normal
+    if attr == 'dopamine' and human.ssri_level > 0:
+        ssri_pct = human.ssri_level / 100.0
+        scaled_amount *= (1 - ssri_pct * 0.4)
 
     # Consume reserves (0.5 per point of boost), clamp to 0
     human.reserves[reserve_key] = max(0, human.reserves[reserve_key] - raw_amount * 0.5)
@@ -213,6 +259,11 @@ def compute_receptivity(human: Human, category: str) -> float:
 
     # 'rest' category: always receptive (r stays 1.0)
 
+    # Life stress penalty: hard to enjoy things when stressed (except rest)
+    if category != 'rest':
+        stress_pct = human.life_stress / 100.0
+        r -= stress_pct * 0.3
+
     return max(-0.5, min(1.0, r))
 
 
@@ -314,7 +365,8 @@ def apply_decay(human: Human, dt: float):
     dt is time in hours.
     """
     # === HOMEOSTATIC DECAY with reserve-depressed baselines ===
-    for attr, baseline in BASELINES.items():
+    effective_baselines = get_effective_baselines(human)
+    for attr, baseline in effective_baselines.items():
         if attr in DECAY_RATES:
             current = getattr(human, attr)
             rate = DECAY_RATES[attr]
@@ -336,6 +388,12 @@ def apply_decay(human: Human, dt: float):
 
     # Energy decreases over time when awake
     human.energy -= 2.0 * dt  # lose 2 energy per hour when active
+
+    # Life stress continuous effects
+    if human.life_stress > 0:
+        stress_pct = human.life_stress / 100.0
+        human.absorption -= stress_pct * 2 * dt        # absorption drain (-2/hr at max)
+        human.psychological_health -= stress_pct * 0.5 * dt  # psych health drain (-0.5/hr at max)
 
     # Digestion effects: while digesting, sleepiness increases and arousal is suppressed
     if human.digesting > 0:
@@ -542,9 +600,10 @@ def make_events() -> dict[str, Event]:
     )
 
     def sleep(h, eff=1.0):
+        eb = get_effective_baselines(h)
         h.energy += 35
         h.hunger += 10
-        h.dopamine = BASELINES['dopamine']
+        h.dopamine = eb['dopamine']
         h.serotonin += 10
         h.psychological_health += 2
         h.arousal = 10
@@ -552,10 +611,10 @@ def make_events() -> dict[str, Event]:
         h.prefrontal = 60
         h.sleepiness = 10
         h.digesting = 0
-        h.anxiety = BASELINES['anxiety']
-        h.absorption = BASELINES['absorption']
-        h.prolactin = BASELINES['prolactin']
-        h.vasopressin = BASELINES['vasopressin']
+        h.anxiety = eb['anxiety']
+        h.absorption = eb['absorption']
+        h.prolactin = eb['prolactin']
+        h.vasopressin = eb['vasopressin']
         # Sleep special: restore reserves and reduce tolerance
         for nt in h.reserves:
             h.reserves[nt] += SLEEP_RESERVE_RESTORE
@@ -1114,6 +1173,188 @@ def make_events() -> dict[str, Event]:
         category='drugs',
         can_apply=lambda h: h.energy > 20,
         description="Nitrous oxide - brief euphoria, dissociation"
+    )
+
+    # --- Medical events ---
+
+    def take_ssri(h, eff=1.0):
+        """Take SSRI medication - builds ssri_level over time."""
+        h.ssri_level += 8
+        h.serotonin += 3 * eff
+        h.anxiety += 5  # early side effect: nausea
+        h.ssri_level = max(0.0, min(100.0, h.ssri_level))
+
+    events['take_ssri'] = Event(
+        name='take_ssri',
+        duration=0.1,
+        apply=take_ssri,
+        category='medical',
+        description="Take SSRI medication"
+    )
+
+    def stop_ssri(h, eff=1.0):
+        """Stop SSRI - withdrawal effects."""
+        h.ssri_level -= 12
+        h.anxiety += 10
+        h.serotonin -= 5
+        h.ssri_level = max(0.0, min(100.0, h.ssri_level))
+
+    events['stop_ssri'] = Event(
+        name='stop_ssri',
+        duration=0.1,
+        apply=stop_ssri,
+        category='medical',
+        can_apply=lambda h: h.ssri_level > 10,
+        description="Stop SSRI medication (withdrawal)"
+    )
+
+    def testosterone_injection(h, eff=1.0):
+        """Testosterone injection - raises T level."""
+        h.testosterone += 10
+        h.energy += 5
+        h.arousal += 5 * eff
+        h.anxiety += 3  # injection stress
+        h.testosterone = max(0.0, min(100.0, h.testosterone))
+
+    events['testosterone_injection'] = Event(
+        name='testosterone_injection',
+        duration=0.25,
+        apply=testosterone_injection,
+        category='medical',
+        description="Testosterone injection"
+    )
+
+    def anti_androgen(h, eff=1.0):
+        """Anti-androgen medication - lowers testosterone."""
+        h.testosterone -= 10
+        h.anxiety -= 3
+        h.arousal -= 5
+        h.testosterone = max(0.0, min(100.0, h.testosterone))
+
+    events['anti_androgen'] = Event(
+        name='anti_androgen',
+        duration=0.1,
+        apply=anti_androgen,
+        category='medical',
+        can_apply=lambda h: h.testosterone > 10,
+        description="Anti-androgen medication"
+    )
+
+    def therapy_session(h, eff=1.0):
+        """Therapy session - reduces stress, improves mental health."""
+        h.life_stress -= 8
+        h.psychological_health += 3
+        h.anxiety -= 10
+        h.prefrontal += 10
+        h.life_stress = max(0.0, min(100.0, h.life_stress))
+
+    events['therapy_session'] = Event(
+        name='therapy_session',
+        duration=1.0,
+        apply=therapy_session,
+        category='medical',
+        description="Therapy session"
+    )
+
+    # --- Life events ---
+
+    def job_loss(h, eff=1.0):
+        """Job loss - major life stressor."""
+        h.life_stress += 25
+        h.anxiety += 20
+        h.psychological_health -= 5
+        h.energy -= 10
+        h.life_stress = max(0.0, min(100.0, h.life_stress))
+
+    events['job_loss'] = Event(
+        name='job_loss',
+        duration=0.5,
+        apply=job_loss,
+        category='life',
+        can_apply=lambda h: h.life_stress < 80,
+        description="Job loss"
+    )
+
+    def financial_crisis(h, eff=1.0):
+        """Financial crisis - severe stressor."""
+        h.life_stress += 30
+        h.anxiety += 25
+        h.psychological_health -= 8
+        h.life_stress = max(0.0, min(100.0, h.life_stress))
+
+    events['financial_crisis'] = Event(
+        name='financial_crisis',
+        duration=0.5,
+        apply=financial_crisis,
+        category='life',
+        can_apply=lambda h: h.life_stress < 85,
+        description="Financial crisis"
+    )
+
+    def breakup(h, eff=1.0):
+        """Breakup - emotional distress."""
+        h.life_stress += 20
+        h.anxiety += 15
+        h.oxytocin -= 15
+        h.psychological_health -= 10
+        h.life_stress = max(0.0, min(100.0, h.life_stress))
+
+    events['breakup'] = Event(
+        name='breakup',
+        duration=1.0,
+        apply=breakup,
+        category='life',
+        description="Breakup"
+    )
+
+    def get_job(h, eff=1.0):
+        """Get a job - reduces stress, boosts mood."""
+        h.life_stress -= 20
+        h.anxiety -= 10
+        nt_boost(h, 'dopamine', 10 * eff)
+        h.psychological_health += 3
+        h.life_stress = max(0.0, min(100.0, h.life_stress))
+
+    events['get_job'] = Event(
+        name='get_job',
+        duration=0.5,
+        apply=get_job,
+        category='life',
+        can_apply=lambda h: h.life_stress > 15,
+        description="Get a new job"
+    )
+
+    def resolve_finances(h, eff=1.0):
+        """Resolve financial issues - stress relief."""
+        h.life_stress -= 15
+        h.anxiety -= 8
+        h.psychological_health += 2
+        h.life_stress = max(0.0, min(100.0, h.life_stress))
+
+    events['resolve_finances'] = Event(
+        name='resolve_finances',
+        duration=0.5,
+        apply=resolve_finances,
+        category='life',
+        can_apply=lambda h: h.life_stress > 10,
+        description="Resolve financial issues"
+    )
+
+    def new_relationship(h, eff=1.0):
+        """New relationship - bonding, mood boost."""
+        h.life_stress -= 10
+        nt_boost(h, 'oxytocin', 20 * eff)
+        nt_boost(h, 'dopamine', 15 * eff)
+        h.anxiety -= 5
+        h.psychological_health += 5
+        h.life_stress = max(0.0, min(100.0, h.life_stress))
+
+    events['new_relationship'] = Event(
+        name='new_relationship',
+        duration=1.0,
+        apply=new_relationship,
+        category='life',
+        description="New relationship"
     )
 
     return events

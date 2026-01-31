@@ -966,6 +966,291 @@ class TestContextReceptivity(unittest.TestCase):
             self.assertLessEqual(r, 1.0, f"{category} receptivity above 1.0")
 
 
+class TestTraitDynamics(unittest.TestCase):
+    """Tests for meta-traits: testosterone ongoing, SSRI, life stress, interactions."""
+
+    def setUp(self):
+        self.events = make_events()
+        import events as ev
+        self._orig_prob = ev.ENABLE_PROBABILISTIC
+        ev.ENABLE_PROBABILISTIC = False
+
+    def tearDown(self):
+        import events as ev
+        ev.ENABLE_PROBABILISTIC = self._orig_prob
+
+    def test_high_t_decays_toward_higher_arousal(self):
+        """High-T human decays toward higher arousal baseline than low-T."""
+        from human import create_human
+        h_high = create_human(testosterone=90)
+        h_low = create_human(testosterone=10)
+        # Set both to same arousal, then decay
+        h_high.arousal = 50.0
+        h_low.arousal = 50.0
+        decay_only(h_high, 3.0)
+        decay_only(h_low, 3.0)
+        self.assertGreater(h_high.arousal, h_low.arousal,
+                           "High-T should decay toward higher arousal baseline")
+
+    def test_ssri_reduces_dopamine_from_cocaine(self):
+        """SSRI human gets less dopamine from cocaine than non-SSRI."""
+        from human import create_human
+        h_ssri = create_human(ssri_level=80)
+        h_normal = create_human(ssri_level=0)
+        h_ssri.energy = 80
+        h_normal.energy = 80
+        h_ssri.dopamine = 50.0
+        h_normal.dopamine = 50.0
+        apply_event(h_ssri, 'cocaine', self.events['cocaine'])
+        apply_event(h_normal, 'cocaine', self.events['cocaine'])
+        self.assertLess(h_ssri.dopamine, h_normal.dopamine,
+                        "SSRI human should get less dopamine from cocaine")
+
+    def test_ssri_boosts_serotonin_baseline(self):
+        """SSRI human should decay toward higher serotonin baseline."""
+        from human import create_human
+        from events import get_effective_baselines
+        h_ssri = create_human(ssri_level=80)
+        eb = get_effective_baselines(h_ssri)
+        self.assertGreater(eb['serotonin'], 50.0,
+                           "SSRI should raise serotonin baseline")
+
+    def test_ssri_emotional_blunting(self):
+        """SSRI should reduce absorption amplification bonus in pleasure_score."""
+        from human import create_human
+        h_ssri = create_human(ssri_level=80)
+        h_normal = create_human(ssri_level=0)
+        # Set identical state except SSRI
+        for h in [h_ssri, h_normal]:
+            h.dopamine = 60
+            h.endorphins = 50
+            h.oxytocin = 40
+            h.serotonin = 55
+            h.anxiety = 30
+            h.absorption = 80  # high absorption to show blunting
+        p_ssri = h_ssri.pleasure_score()
+        p_normal = h_normal.pleasure_score()
+        self.assertLess(p_ssri, p_normal,
+                        "SSRI should reduce pleasure via absorption blunting")
+
+    def test_life_stress_reduces_receptivity(self):
+        """Stressed human's receptivity is lower across non-rest categories."""
+        from human import create_human
+        from events import compute_receptivity
+        h_stressed = create_human(life_stress=80)
+        h_calm = create_human(life_stress=0)
+        for category in ['sexual', 'social', 'food', 'drugs']:
+            r_stressed = compute_receptivity(h_stressed, category)
+            r_calm = compute_receptivity(h_calm, category)
+            self.assertLess(r_stressed, r_calm,
+                            f"Stressed human should have lower {category} receptivity")
+        # Rest should be unaffected
+        self.assertAlmostEqual(
+            compute_receptivity(h_stressed, 'rest'),
+            compute_receptivity(h_calm, 'rest'),
+            places=2,
+            msg="Rest receptivity should not be affected by stress"
+        )
+
+    def test_life_stress_absorption_drain(self):
+        """Stressed human should lose absorption over time."""
+        from human import create_human
+        h = create_human(life_stress=80)
+        h.absorption = 50.0
+        initial = h.absorption
+        decay_only(h, 1.0)
+        self.assertLess(h.absorption, initial - 1.0,
+                        "Life stress should drain absorption over time")
+
+    def test_life_stress_psych_health_drain(self):
+        """Stressed human should lose psychological health over time."""
+        from human import create_human
+        h = create_human(life_stress=80)
+        initial = h.psychological_health
+        decay_only(h, 2.0)
+        self.assertLess(h.psychological_health, initial,
+                        "Life stress should drain psychological health")
+
+    def test_ssri_plus_stress_moderate_anxiety(self):
+        """SSRI + stress combo has moderate anxiety (partial offset)."""
+        from events import get_effective_baselines
+        from human import create_human
+        h_both = create_human(ssri_level=60, life_stress=60)
+        h_stress_only = create_human(life_stress=60)
+        h_ssri_only = create_human(ssri_level=60)
+        eb_both = get_effective_baselines(h_both)
+        eb_stress = get_effective_baselines(h_stress_only)
+        eb_ssri = get_effective_baselines(h_ssri_only)
+        # SSRI should partially offset stress anxiety
+        self.assertLess(eb_both['anxiety'], eb_stress['anxiety'],
+                        "SSRI should partially offset stress anxiety")
+        self.assertGreater(eb_both['anxiety'], eb_ssri['anxiety'],
+                           "Stress should partially offset SSRI anxiety reduction")
+
+    def test_stressed_person_wakes_with_higher_anxiety(self):
+        """Stressed person wakes up with higher anxiety than unstressed."""
+        from human import create_human
+        h_stressed = create_human(life_stress=70)
+        h_calm = create_human(life_stress=0)
+        h_stressed.energy = 40
+        h_stressed.sleepiness = 60
+        h_calm.energy = 40
+        h_calm.sleepiness = 60
+        apply_event(h_stressed, 'sleep', self.events['sleep'])
+        apply_event(h_calm, 'sleep', self.events['sleep'])
+        self.assertGreater(h_stressed.anxiety, h_calm.anxiety,
+                           "Stressed person should wake with higher anxiety")
+
+    def test_ssri_person_wakes_with_higher_prolactin(self):
+        """SSRI person wakes up with higher prolactin baseline."""
+        from human import create_human
+        h_ssri = create_human(ssri_level=70)
+        h_normal = create_human(ssri_level=0)
+        h_ssri.energy = 40
+        h_ssri.sleepiness = 60
+        h_normal.energy = 40
+        h_normal.sleepiness = 60
+        apply_event(h_ssri, 'sleep', self.events['sleep'])
+        apply_event(h_normal, 'sleep', self.events['sleep'])
+        self.assertGreater(h_ssri.prolactin, h_normal.prolactin,
+                           "SSRI person should wake with higher prolactin")
+
+    def test_testosterone_ongoing_vasopressin(self):
+        """High-T human decays toward higher vasopressin baseline."""
+        from human import create_human
+        h_high = create_human(testosterone=90)
+        h_low = create_human(testosterone=10)
+        h_high.vasopressin = 40.0
+        h_low.vasopressin = 40.0
+        decay_only(h_high, 3.0)
+        decay_only(h_low, 3.0)
+        self.assertGreater(h_high.vasopressin, h_low.vasopressin,
+                           "High-T should decay toward higher vasopressin baseline")
+
+
+class TestDynamicTraitEvents(unittest.TestCase):
+    """Tests for dynamic trait events (medical and life categories)."""
+
+    def setUp(self):
+        self.events = make_events()
+        import events as ev
+        self._orig_prob = ev.ENABLE_PROBABILISTIC
+        ev.ENABLE_PROBABILISTIC = False
+
+    def tearDown(self):
+        import events as ev
+        ev.ENABLE_PROBABILISTIC = self._orig_prob
+
+    def test_ssri_gradual_buildup(self):
+        """10x take_ssri raises ssri_level significantly."""
+        h = Human()
+        initial_ssri = h.ssri_level
+        apply_n_times(h, 'take_ssri', self.events, 10)
+        self.assertGreater(h.ssri_level, initial_ssri + 30,
+                           "10x take_ssri should raise ssri_level significantly")
+
+    def test_ssri_withdrawal(self):
+        """stop_ssri reduces ssri_level and increases anxiety."""
+        h = Human()
+        h.ssri_level = 50.0
+        initial_ssri = h.ssri_level
+        initial_anxiety = h.anxiety
+        apply_event(h, 'stop_ssri', self.events['stop_ssri'])
+        self.assertLess(h.ssri_level, initial_ssri,
+                        "stop_ssri should reduce ssri_level")
+        self.assertGreater(h.anxiety, initial_anxiety,
+                           "stop_ssri should increase anxiety")
+
+    def test_testosterone_injection_raises_t(self):
+        """testosterone_injection increases testosterone."""
+        h = Human()
+        initial_t = h.testosterone
+        apply_event(h, 'testosterone_injection', self.events['testosterone_injection'])
+        self.assertGreater(h.testosterone, initial_t,
+                           "testosterone_injection should increase testosterone")
+
+    def test_job_loss_increases_stress(self):
+        """job_loss raises life_stress and anxiety."""
+        h = Human()
+        initial_stress = h.life_stress
+        initial_anxiety = h.anxiety
+        apply_event(h, 'job_loss', self.events['job_loss'])
+        self.assertGreater(h.life_stress, initial_stress,
+                           "job_loss should increase life_stress")
+        self.assertGreater(h.anxiety, initial_anxiety,
+                           "job_loss should increase anxiety")
+
+    def test_resolve_finances_decreases_stress(self):
+        """resolve_finances lowers life_stress."""
+        h = Human()
+        h.life_stress = 50.0
+        initial_stress = h.life_stress
+        apply_event(h, 'resolve_finances', self.events['resolve_finances'])
+        self.assertLess(h.life_stress, initial_stress,
+                        "resolve_finances should lower life_stress")
+
+    def test_therapy_reduces_stress(self):
+        """therapy_session reduces life_stress."""
+        h = Human()
+        h.life_stress = 50.0
+        initial_stress = h.life_stress
+        apply_event(h, 'therapy_session', self.events['therapy_session'])
+        self.assertLess(h.life_stress, initial_stress,
+                        "therapy_session should reduce life_stress")
+
+    def test_trait_clamping(self):
+        """Traits stay in [0, 100] after extreme events."""
+        # Test upper bound
+        h = Human()
+        h.ssri_level = 95.0
+        apply_n_times(h, 'take_ssri', self.events, 5)
+        self.assertLessEqual(h.ssri_level, 100.0,
+                             "ssri_level should not exceed 100")
+
+        # Test lower bound
+        h2 = Human()
+        h2.life_stress = 5.0
+        h2.life_stress = max(0.0, h2.life_stress)  # ensure starts valid
+        # Apply therapy multiple times to try to go below 0
+        for _ in range(10):
+            self.events['therapy_session'].apply(h2, 1.0)
+        self.assertGreaterEqual(h2.life_stress, 0.0,
+                                "life_stress should not go below 0")
+
+        # Test testosterone upper bound
+        h3 = Human()
+        h3.testosterone = 95.0
+        for _ in range(5):
+            self.events['testosterone_injection'].apply(h3, 1.0)
+        self.assertLessEqual(h3.testosterone, 100.0,
+                             "testosterone should not exceed 100")
+
+        # Test testosterone lower bound
+        h4 = Human()
+        h4.testosterone = 15.0
+        for _ in range(5):
+            self.events['anti_androgen'].apply(h4, 1.0)
+        self.assertGreaterEqual(h4.testosterone, 0.0,
+                                "testosterone should not go below 0")
+
+    def test_life_events_affect_baselines(self):
+        """After job_loss + decay, anxiety baseline is higher."""
+        h = Human()
+        h_control = Human()
+
+        # Apply job_loss to stressed human
+        apply_event(h, 'job_loss', self.events['job_loss'])
+
+        # Let both decay for a while
+        decay_only(h, 3.0)
+        decay_only(h_control, 3.0)
+
+        # The human who lost their job should have higher anxiety
+        # because life_stress raises the anxiety baseline
+        self.assertGreater(h.anxiety, h_control.anxiety,
+                           "After job_loss + decay, anxiety should be higher than control")
+
+
 if __name__ == '__main__':
     # Import random for probabilistic tests
     import random
