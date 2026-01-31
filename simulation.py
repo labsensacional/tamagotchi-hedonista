@@ -211,17 +211,22 @@ class Simulation:
                         current_event = event_name
                         event_index += 1
 
-                        # Sub-step through event duration
-                        steps_for_event = max(1, int(event.duration / self.time_step))
-                        for _ in range(steps_for_event):
-                            apply_decay(human, self.time_step)
+                        # Sub-step through event duration with remainder
+                        full_steps = int(event.duration / self.time_step)
+                        remainder = event.duration - full_steps * self.time_step
+                        sub_steps = [self.time_step] * full_steps
+                        if remainder > 1e-9:
+                            sub_steps.append(remainder)
+
+                        for dt in sub_steps:
+                            apply_decay(human, dt)
                             human.clamp_values()
                             if not human.is_viable():
                                 viable = False
                                 break
                             pleasure = human.pleasure_score()
-                            total_pleasure += pleasure * self.time_step
-                            current_time += self.time_step
+                            total_pleasure += pleasure * dt
+                            current_time += dt
                             time_steps += 1
                             timeline.append((current_time, pleasure, current_event))
                             if verbose:
@@ -342,16 +347,21 @@ def interactive_mode():
             # Apply the event
             apply_event(human, event_name, event)
 
-            # Sub-step through event duration
-            steps_for_event = max(1, int(event.duration / sim.time_step))
-            for _ in range(steps_for_event):
-                apply_decay(human, sim.time_step)
+            # Sub-step through event duration with remainder
+            full_steps = int(event.duration / sim.time_step)
+            remainder = event.duration - full_steps * sim.time_step
+            sub_steps = [sim.time_step] * full_steps
+            if remainder > 1e-9:
+                sub_steps.append(remainder)
+
+            for dt in sub_steps:
+                apply_decay(human, dt)
                 human.clamp_values()
                 if not human.is_viable():
                     break
                 pleasure = human.pleasure_score()
-                total_pleasure += pleasure * sim.time_step
-                current_time += sim.time_step
+                total_pleasure += pleasure * dt
+                current_time += dt
 
             # Show result
             print(format_status(human, event_name, current_time))

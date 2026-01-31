@@ -52,8 +52,15 @@ class TestAxioms(unittest.TestCase):
 
     def setUp(self):
         """Fresh human and events for each test."""
+        import events as ev
+        self._orig_prob = ev.ENABLE_PROBABILISTIC
+        ev.ENABLE_PROBABILISTIC = False
         self.human = Human()
         self.events = make_events()
+
+    def tearDown(self):
+        import events as ev
+        ev.ENABLE_PROBABILISTIC = self._orig_prob
 
     # -----------------------------------------------------------------
     # Axiom 0: No trivially exploitable loop
@@ -113,15 +120,15 @@ class TestAxioms(unittest.TestCase):
     # Deep breathing should suppress arousal (parasympathetic activation)
     # -----------------------------------------------------------------
     def test_axiom2_dive_reflex(self):
-        """Deep breathing suppresses arousal (mammalian dive reflex)."""
+        """Cold face immersion suppresses arousal (mammalian dive reflex)."""
         h = Human()
         h.arousal = 60  # elevated arousal
         initial_arousal = h.arousal
 
-        apply_event(h, 'deep_breathing', self.events['deep_breathing'])
+        apply_event(h, 'cold_face_immersion', self.events['cold_face_immersion'])
 
         self.assertLess(h.arousal, initial_arousal,
-                        "Deep breathing should reduce arousal via dive reflex")
+                        "Cold face immersion should reduce arousal via dive reflex")
 
     # -----------------------------------------------------------------
     # Axiom 3: Can't repeat forever
@@ -175,7 +182,7 @@ class TestAxioms(unittest.TestCase):
                         f"Post-crash pleasure ({final_pleasure:.1f}) "
                         f"should be noticeably below peak ({peak_pleasure:.1f})")
         # And reserves should be depleted
-        self.assertLess(h.reserves['dopamine'], 90,
+        self.assertLess(h.reserves['dopamine'], 80,
                         f"Dopamine reserves should be depleted after spree")
 
     # -----------------------------------------------------------------
@@ -543,13 +550,12 @@ class TestDrugEvents(unittest.TestCase):
 
     def test_drugs_have_category(self):
         """All drug events should be in the 'drugs' category."""
-        from events import EVENT_CATEGORIES
         drug_names = [
             'mdma', 'weed', 'mushrooms', 'lsd', 'poppers', 'ketamine',
             'tobacco', 'caffeine', 'alcohol', 'amphetamines', 'cocaine', 'nitrous'
         ]
         for name in drug_names:
-            self.assertEqual(EVENT_CATEGORIES[name], 'drugs',
+            self.assertEqual(self.events[name].category, 'drugs',
                              f"'{name}' should be in 'drugs' category")
 
     def test_mdma_boosts_serotonin_and_oxytocin(self):

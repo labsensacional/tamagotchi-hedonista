@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 
 def create_human(testosterone: float = 50.0) -> 'Human':
@@ -82,25 +82,25 @@ class Human:
         'breathwork': 0.0, 'food': 0.0, 'rest': 0.0, 'drugs': 0.0
     })
 
+    # Fields excluded from 0-100 clamping (unbounded or non-numeric)
+    _UNCLAMPED_FIELDS = frozenset({
+        'time_since_orgasm',  # unbounded time counter
+        'tolerance', 'reserves', 'cue_salience',  # dicts, clamped separately
+        'active_effects', 'rebound_queue',  # lists, not clamped
+    })
+
     def clamp_values(self):
-        """Keep all values within valid bounds."""
-        self.dopamine = max(0, min(100, self.dopamine))
-        self.oxytocin = max(0, min(100, self.oxytocin))
-        self.endorphins = max(0, min(100, self.endorphins))
-        self.serotonin = max(0, min(100, self.serotonin))
-        self.prolactin = max(0, min(100, self.prolactin))
-        self.vasopressin = max(0, min(100, self.vasopressin))
-        self.arousal = max(0, min(100, self.arousal))
-        self.prefrontal = max(0, min(100, self.prefrontal))
-        self.sleepiness = max(0, min(100, self.sleepiness))
-        self.anxiety = max(0, min(100, self.anxiety))
-        self.absorption = max(0, min(100, self.absorption))
-        self.hunger = max(0, min(100, self.hunger))
-        self.energy = max(0, min(100, self.energy))
-        self.physical_health = max(0, min(100, self.physical_health))
-        self.psychological_health = max(0, min(100, self.psychological_health))
-        self.edging_buildup = max(0, min(100, self.edging_buildup))
-        self.digesting = max(0, min(100, self.digesting))
+        """Keep all values within valid bounds.
+        Float fields are clamped to [0, 100] by default.
+        Dict fields have their own bounds.
+        """
+        for f in fields(self):
+            if f.name in self._UNCLAMPED_FIELDS:
+                continue
+            if f.type == 'float' or f.type is float:
+                val = getattr(self, f.name)
+                setattr(self, f.name, max(0, min(100, val)))
+
         for k in self.reserves:
             self.reserves[k] = max(0, min(100, self.reserves[k]))
         for k in self.tolerance:

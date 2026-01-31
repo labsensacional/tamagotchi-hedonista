@@ -47,37 +47,6 @@ DECAY_RATES = {
 # TOLERANCE & RESERVES - Physiological Realism
 # =============================================================================
 
-# Maps each event to its tolerance category
-EVENT_CATEGORIES = {
-    'light_stimulation': 'sexual',
-    'intense_stimulation': 'sexual',
-    'edging': 'sexual',
-    'orgasm': 'sexual',
-    'light_pain': 'pain',
-    'temperature_play': 'pain',
-    'cuddling': 'social',
-    'massage': 'social',
-    'deep_breathing': 'breathwork',
-    'holotropic_breathing': 'breathwork',
-    'snack': 'food',
-    'eat': 'food',
-    'sleep': 'rest',
-    'rest': 'rest',
-    'wait': 'rest',
-    'mdma': 'drugs',
-    'weed': 'drugs',
-    'mushrooms': 'drugs',
-    'lsd': 'drugs',
-    'poppers': 'drugs',
-    'ketamine': 'drugs',
-    'tobacco': 'drugs',
-    'caffeine': 'drugs',
-    'alcohol': 'drugs',
-    'amphetamines': 'drugs',
-    'cocaine': 'drugs',
-    'nitrous': 'drugs',
-}
-
 # How much tolerance increases per use of each category
 TOLERANCE_GAINS = {
     'sexual': 0.12,
@@ -139,8 +108,8 @@ def nt_boost(human: Human, attr: str, raw_amount: float, is_orgasm: bool = False
     scale_factor = 0.15 + 0.85 * (reserve_level / 100.0)
     scaled_amount = raw_amount * scale_factor
 
-    # Consume reserves (0.5 per point of boost)
-    human.reserves[reserve_key] -= raw_amount * 0.5
+    # Consume reserves (0.5 per point of boost), clamp to 0
+    human.reserves[reserve_key] = max(0, human.reserves[reserve_key] - raw_amount * 0.5)
 
     # Split immediate vs sustained
     if is_orgasm:
@@ -297,7 +266,7 @@ def apply_event(human: Human, event_name: str, event: 'Event'):
     2. Call event.apply(human, effectiveness)
     3. Update tolerance for the event's category
     """
-    category = EVENT_CATEGORIES.get(event_name, 'rest')
+    category = event.category
     tolerance = human.tolerance.get(category, 0.0)
 
     # Tolerance: 1.0 at tolerance=0, 0.4 at tolerance=1.0
@@ -807,9 +776,8 @@ def make_events() -> dict[str, Event]:
     # --- Breathwork/altered states ---
 
     def deep_breathing(h, eff=1.0):
-        """Calming breathwork - parasympathetic activation + dive reflex."""
+        """Calming breathwork - parasympathetic upshift, vagal tone increase."""
         h.prefrontal -= 10           # cost: not scaled
-        h.arousal -= 5               # dive reflex: parasympathetic suppresses arousal
         nt_boost(h, 'serotonin', 8 * eff)
         h.psychological_health += 1 * eff
         h.energy += 3
@@ -822,6 +790,29 @@ def make_events() -> dict[str, Event]:
         apply=deep_breathing,
         category='breathwork',
         description="Deep, slow breathing exercises"
+    )
+
+    def cold_face_immersion(h, eff=1.0):
+        """Mammalian dive reflex - cold water on face triggers bradycardia,
+        peripheral vasoconstriction, strong arousal suppression.
+        Brief cold shock releases endorphins."""
+        h.anxiety += 5               # cost: cold shock startle
+        h.energy -= 3                # cost: not scaled
+        h.arousal -= 15 * eff        # bradycardia, strong parasympathetic override
+        h.prefrontal -= 10           # cost: not scaled
+        nt_boost(h, 'endorphins', 12 * eff)  # cold shock endorphin release
+        nt_boost(h, 'serotonin', 5 * eff)
+        h.anxiety -= 12 * eff        # net calming after initial shock
+        h.absorption += 5 * eff
+        h.sleepiness -= 10 * eff     # alerting effect from cold
+
+    events['cold_face_immersion'] = Event(
+        name='cold_face_immersion',
+        duration=0.05,
+        apply=cold_face_immersion,
+        category='breathwork',
+        can_apply=lambda h: h.energy > 10,
+        description="Cold water face immersion - mammalian dive reflex"
     )
 
     def holotropic_breathing(h, eff=1.0):
