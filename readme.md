@@ -25,6 +25,20 @@ Instead of asking “is this action good or bad?”, the simulator asks:
 The simulator does not decide what to do.
 The user does.
 
+## Que es?
+
+Algunas ideas posibles
+
+- primera persona? Algun personaje generico tipo don satur/sonic/...
+- monstruo? frankenstein? zombie? egregore? demon? sucubus? homunculo?
+- fantasma?
+- vampiro?
+- esclavo
+- robot humanoide
+- animal humanoide
+- alien humanoide
+- pokemon
+
 ## Tests as axioms
 
 The project is heavily test-driven.
@@ -56,8 +70,34 @@ If a refactor breaks a test, it means a theory was violated.
 - physiological sandbox
 - affect simulator
 
-## References
+## Decisiones de diseño
 
+- Las acciones son secuenciales, no se pueden componer y hacer en paralelo. Si fuera de interes explorar esa interaccion, por ejemplo "consumir marihuana en un tanque de flotacion" o "penetrasion anal mientras se hace deepthroat" entonces se debe crear una accion nueva que contenga las dos juntas
+- No se modelan mecanismos de inferencia de affect se modelan de forma explicita en acciones, por ejemplo "recibir un abrazo de un amigo" se asume por default positivo y que genera un juicio positivo y una experiencia de placer. Aunque se pueden modelar mecanicas donde cosas como el cortisol afecten esas acciones, que ciertas acciones cambien de polaridad cuento el cortisol esta alto y el prefrontal cortes esta muy activo o cosas asi (no hay tiempo de sentir placer si estas preocupado por algo) o por ejemplo cuando estas muy caliente, todo se convierte en placer y algo sexual, incluso dolor, insultos y demas.
+- Las animaciones y el personaje tienen ciertas animaciones pero son predefinidas, siempre mas o menos iguales, esta en una habitacion, no puede moverse de ahi, no hay un espacio caminable o algo asi
+- No se modelan los detalles fisicos del mundo, como se mueve el personaje o cosas asi. El foco esta en abstraer acciones en el mundo como algo que se da por sentado que se puede lograr de hacer y abstraer fisiologia de bajo nivel del cuerpo como modulos a grandes rasgos (niveles de neurotransmisores, sistema digestivo, prefrontal cortex, atencion, arousal, ...) y modelar como 
+- Los modelos no tienen motivaciones, no toman decisiones, el usuario las toma por ellos
+- El objetivo es mantener lo mas simple posible un simulador que logra capturar dinamicas sobre como distintas acciones afectan a la gente en terminos de cuan bien la pasan
+    - dinamicas donde no es todo tan simple como "acciones buenas y malas" sino que emergen patrones complejos como pasa en el bdsm donde se consigue placer y extasis mezclando valencias
+
+- El sistema se entiende como dos subsistemas
+    - Backend
+        - Tiene todas las reglas logicas del sistema. Crea instancia de personaje dadas unas variables metas y la clase humano y actions
+        - Aplica las actions y actualiza el estado del personaje
+    - Frontend
+        - Sitio web que muestra de forma visual y sonora como esta el personaje
+            - Hay animaciones y sonidos para cada accion. Quizas eventualmente pueden ir cambiando
+            - El personaje es algo tierno que atrapa. Quizas eventualmente se podria personalizar?
+
+## Ideas a futuro
+
+Si se inicializa un sistema basico con muchos agentes en un espacio 2D y se implementan dinamicas como
+- emotional contagion (influencia sobre emociones de agentes cercanos)
+- arousal synchronization
+- mismatch dynamics
+- oxytocin/vasopressin cross coupling (dominacion/sumision? Leary Circuit 2 and 4: Emotional-Territorial and Attachment & social identity mind spaces?)
+
+## References
 
 ### Related projects
 
@@ -73,7 +113,7 @@ If a refactor breaks a test, it means a theory was violated.
 - sandspiel.club y orb.farm (Max Bittker and Lu Wilson projeects)
     - https://studio.sandspiel.club/
     - https://sandpond.cool/
-- boids
+- game of life, boids, particle life, Abelian sandpile model
 
 ### Related ideas
 
@@ -130,6 +170,8 @@ Some useful concepts below. Besides that this [google slide](https://docs.google
 - Sexual Secrets: The Alchemy of Ecstasy (1999) — Nik Douglas, Penny Slinger  
 - The History of Sexuality — Michel Foucault  
 - Ericksonian hypnosis and neuro-linguistic programming (NLP) ideas  
+- Triune brain
+- Timothy Leary. / Robert Anton Wilson’s 8-Circuit Model
 
 #### Psychology, psychiatry, and sexology (classics)
 - The Erotic Mind: Unlocking the Inner Sources of Passion and Fulfillment — Jack Morin  
@@ -137,40 +179,7 @@ Some useful concepts below. Besides that this [google slide](https://docs.google
 - The Man Who Mistook His Wife for a Hat — Oliver Sacks  
 - Kinsey and Masters & Johnson studies
 
+#### Dynamical Systems
 
+- Self-organized criticality
 
-## Decisiones de diseño
-
-- Las acciones son secuenciales, no se pueden componer y hacer en paralelo. Si fuera de interes explorar esa interaccion, por ejemplo "consumir marihuana en un tanque de flotacion" o "penetrasion anal mientras se hace deepthroat" entonces se debe crear una accion nueva que contenga las dos juntas
-- No se modelan mecanismos de inferencia de affect se modelan de forma explicita en acciones, por ejemplo "recibir un abrazo de un amigo" se asume por default positivo y que genera un juicio positivo y una experiencia de placer. Aunque se pueden modelar mecanicas donde cosas como el cortisol afecten esas acciones, que ciertas acciones cambien de polaridad cuento el cortisol esta alto y el prefrontal cortes esta muy activo o cosas asi (no hay tiempo de sentir placer si estas preocupado por algo) o por ejemplo cuando estas muy caliente, todo se convierte en placer y algo sexual, incluso dolor, insultos y demas.
-- Las animaciones y el personaje tienen ciertas animaciones pero son predefinidas, siempre mas o menos iguales, esta en una habitacion, no puede moverse de ahi, no hay un espacio caminable o algo asi
-- No se modelan los detalles fisicos del mundo, como se mueve el personaje o cosas asi. El foco esta en abstraer acciones en el mundo como algo que se da por sentado que se puede lograr de hacer y abstraer fisiologia de bajo nivel del cuerpo como modulos a grandes rasgos (niveles de neurotransmisores, sistema digestivo, prefrontal cortex, atencion, arousal, ...) y modelar como 
-- Los modelos no tienen motivaciones, no toman decisiones, el usuario las toma por ellos
-- El objetivo es mantener lo mas simple posible un simulador que logra capturar dinamicas sobre como distintas acciones afectan a la gente en terminos de cuan bien la pasan
-    - dinamicas donde no es todo tan simple como "acciones buenas y malas" sino que emergen patrones complejos como pasa en el bdsm donde se consigue placer y extasis mezclando valencias
-
-- El sistema se entiende como dos subsistemas
-    - Backend
-        - Tiene todas las reglas logicas del sistema. Crea instancia de personaje dadas unas variables metas y la clase humano y actions
-        - Aplica las actions y actualiza el estado del personaje
-    - Frontend
-        - Sitio web que muestra de forma visual y sonora como esta el personaje. O sea convierte stats del personaje en animaciones. Por ejemplo si tiene mucha ansiedad y hace una accion de irse de fiesta deberia mostrarse la animacion predefinida de ir a una fiesta pero el personaje deberia temblar y mostrarse apatico
-            - Hay animaciones y sonidos para cada accion. Quizas eventualmente pueden ir cambiando
-            - El personaje es algo tierno que atrapa. Quizas eventualmente se podria personalizar?
-            - Las variables alteran como se ve (expresion facial) y como se mueve (temblar, moverse lento, rapido, tono muscular, respiracion, ...)
-        - Tambien esta (minimizado) todo el detalle de stats internas
-        - El sitio tiene los botones de distintas acciones para mandar a que haga el agente
-            - hay un buscador para encontrar acciones escribiendo
-            - tambien estan ordenadas por categorias
-            - tambien aparecen las ultimas 10 que usaste
-            - estaria bueno que sea compartible esto, que la gente pueda sumar y mandar acciones nuevas que crea
-
-## Ideas a futuro
-
-Quizas dar como modo opcional forma de convertir nuevas acciones a reglas y cargarlas. Capaz armar tutorial de como hacerlo con chatGPT. Armar prompt para que convierte "tomar marihuana y masturbarse -> regla de como afecta al agente"
-
-Si se inicializa un sistema basico con muchos agentes en un espacio 2D y se implementan dinamicas como
-- emotional contagion (influencia sobre emociones de agentes cercanos)
-- arousal synchronization
-- mismatch dynamics
-- oxytocin/vasopressin cross coupling

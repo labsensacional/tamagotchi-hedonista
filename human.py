@@ -131,17 +131,16 @@ class Human:
         optimum -= ssri_pct * 8
         return max(10.0, min(50.0, optimum))
 
-    def pleasure_score(self) -> float:
+    def liking_score(self) -> float:
         """
-        Composite pleasure score - what we want to maximize.
-        Weighted combination of feel-good neurotransmitters,
-        modulated by anxiety (reduces pleasure) and absorption (amplifies pleasure).
+        Hedonic wellbeing score - how good it actually feels.
+        Weighted combination of hedonic neurotransmitters (excludes dopamine),
+        modulated by anxiety (Yerkes-Dodson) and absorption (amplifies experience).
         """
-        base_pleasure = (
-            self.dopamine * 0.20 +      # wanting/motivation, not hedonic per se
-            self.endorphins * 0.35 +     # actual hedonic "liking" signal
-            self.oxytocin * 0.20 +       # bonding/warmth pleasure
-            self.serotonin * 0.25        # contentment/wellbeing
+        base_liking = (
+            self.endorphins * 0.40 +     # hedonic "liking" signal
+            self.oxytocin * 0.25 +       # bonding/warmth
+            self.serotonin * 0.35        # contentment/wellbeing
         )
 
         # Yerkes-Dodson inverted-U: individualized optimum
@@ -159,7 +158,38 @@ class Human:
         max_bonus = 0.3 * (1 - ssri_pct * 0.5)
         absorption_factor = 1.0 + (self.absorption / 100) * max_bonus
 
-        return base_pleasure * anxiety_factor * absorption_factor
+        return base_liking * anxiety_factor * absorption_factor
+
+    def wanting_score(self) -> float:
+        """
+        Approach motivation score - how driven/compelled.
+        Based on dopamine (wanting signal) and arousal (physiological drive),
+        with cue salience contribution. Suppressed by prolactin and low energy.
+        """
+        base_wanting = (
+            self.dopamine * 0.50 +       # primary wanting signal
+            self.arousal * 0.25          # physiological drive
+        )
+
+        # Add cue salience contribution (max salience across categories)
+        max_salience = max(self.cue_salience.values()) if self.cue_salience else 0
+        base_wanting += max_salience * 25  # up to +25 from learned wanting
+
+        # Prolactin suppression (refractory/satiation dampens wanting)
+        # At prolactin=0: no suppression. At prolactin=100: 50% suppression.
+        prolactin_factor = 1.0 - (self.prolactin / 100) * 0.5
+
+        # Low energy suppression (depletion reduces drive)
+        # At energy=100: no suppression. At energy=0: 40% suppression.
+        energy_factor = 0.6 + (self.energy / 100) * 0.4
+
+        return base_wanting * prolactin_factor * energy_factor
+
+    def pleasure_score(self) -> float:
+        """
+        Backward-compatible alias for liking_score().
+        """
+        return self.liking_score()
 
     def is_viable(self) -> bool:
         """Check if human is in a viable state (not dead/incapacitated)."""

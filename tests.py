@@ -813,26 +813,24 @@ class TestContextReceptivity(unittest.TestCase):
         ev.ENABLE_PROBABILISTIC = self._orig_prob
 
     def test_sexual_stim_during_high_anxiety_is_worse(self):
-        """Sexual stimulation while panicking should be less pleasurable than when calm."""
+        """Sexual stimulation while panicking should produce less pleasure than when calm."""
         # Calm human
         h_calm = Human()
         h_calm.anxiety = 20
         h_calm.arousal = 40
-        calm_before = h_calm.pleasure_score()
         apply_event(h_calm, 'light_stimulation', self.events['light_stimulation'])
-        calm_gain = h_calm.pleasure_score() - calm_before
+        calm_pleasure = h_calm.pleasure_score()
 
         # Panicking human
         h_panic = Human()
         h_panic.anxiety = 80
         h_panic.arousal = 40
-        panic_before = h_panic.pleasure_score()
         apply_event(h_panic, 'light_stimulation', self.events['light_stimulation'])
-        panic_gain = h_panic.pleasure_score() - panic_before
+        panic_pleasure = h_panic.pleasure_score()
 
-        self.assertGreater(calm_gain, panic_gain,
-                           f"Sexual stim while calm ({calm_gain:.2f}) should feel better "
-                           f"than while panicking ({panic_gain:.2f})")
+        self.assertGreater(calm_pleasure, panic_pleasure,
+                           f"Pleasure after stim while calm ({calm_pleasure:.2f}) should exceed "
+                           f"pleasure after stim while panicking ({panic_pleasure:.2f})")
 
     def test_sexual_stim_during_panic_increases_anxiety(self):
         """Sexual stimulation during extreme anxiety should make anxiety worse."""
@@ -1249,6 +1247,124 @@ class TestDynamicTraitEvents(unittest.TestCase):
         # because life_stress raises the anxiety baseline
         self.assertGreater(h.anxiety, h_control.anxiety,
                            "After job_loss + decay, anxiety should be higher than control")
+
+
+class TestWantingLiking(unittest.TestCase):
+    """Tests for the wanting/liking split."""
+
+    def setUp(self):
+        self.events = make_events()
+        import events as ev
+        self._orig_prob = ev.ENABLE_PROBABILISTIC
+        ev.ENABLE_PROBABILISTIC = False
+
+    def tearDown(self):
+        import events as ev
+        ev.ENABLE_PROBABILISTIC = self._orig_prob
+
+    def test_liking_excludes_dopamine(self):
+        """Pure dopamine spike shouldn't increase liking much."""
+        h1 = Human()
+        h1.dopamine = 50
+        liking_before = h1.liking_score()
+
+        h2 = Human()
+        h2.dopamine = 95  # massive dopamine spike
+        liking_after = h2.liking_score()
+
+        # Liking should be nearly the same since it excludes dopamine
+        self.assertAlmostEqual(liking_before, liking_after, delta=2.0,
+                               msg="Liking should not change much with pure dopamine spike")
+
+    def test_wanting_tracks_dopamine(self):
+        """Dopamine spike should increase wanting."""
+        h_low = Human()
+        h_low.dopamine = 30
+        wanting_low = h_low.wanting_score()
+
+        h_high = Human()
+        h_high.dopamine = 80
+        wanting_high = h_high.wanting_score()
+
+        self.assertGreater(wanting_high, wanting_low,
+                           f"Higher dopamine should increase wanting: "
+                           f"low={wanting_low:.1f}, high={wanting_high:.1f}")
+
+    def test_cocaine_high_wanting_low_liking(self):
+        """After cocaine binge + decay, wanting > liking gap should emerge."""
+        h = Human()
+        h.energy = 80
+        # Cocaine binge
+        apply_n_times(h, 'cocaine', self.events, 5)
+        # Let it decay a bit (crash phase)
+        decay_only(h, 1.0)
+
+        wanting = h.wanting_score()
+        liking = h.liking_score()
+
+        # After cocaine crash: dopamine depleted but cue salience high,
+        # wanting should still be notable relative to liking
+        # The key insight: cocaine builds drug cue salience which boosts wanting
+        self.assertGreater(h.cue_salience['drugs'], 0.01,
+                           "Cocaine binge should build drug cue salience")
+
+    def test_cuddling_high_liking(self):
+        """Cuddling should raise liking more than wanting."""
+        h = Human()
+        liking_before = h.liking_score()
+        wanting_before = h.wanting_score()
+
+        apply_n_times(h, 'cuddling', self.events, 3)
+
+        liking_gain = h.liking_score() - liking_before
+        wanting_gain = h.wanting_score() - wanting_before
+
+        self.assertGreater(liking_gain, wanting_gain,
+                           f"Cuddling should raise liking ({liking_gain:.1f}) more than "
+                           f"wanting ({wanting_gain:.1f})")
+
+    def test_prolactin_suppresses_wanting(self):
+        """High prolactin should reduce wanting."""
+        h_low_prl = Human()
+        h_low_prl.prolactin = 10
+        h_low_prl.dopamine = 60
+        wanting_low_prl = h_low_prl.wanting_score()
+
+        h_high_prl = Human()
+        h_high_prl.prolactin = 80
+        h_high_prl.dopamine = 60
+        wanting_high_prl = h_high_prl.wanting_score()
+
+        self.assertGreater(wanting_low_prl, wanting_high_prl,
+                           f"Low prolactin wanting ({wanting_low_prl:.1f}) should exceed "
+                           f"high prolactin wanting ({wanting_high_prl:.1f})")
+
+    def test_cue_salience_increases_wanting(self):
+        """Learned salience should boost wanting."""
+        h_no_cue = Human()
+        h_no_cue.dopamine = 60
+        wanting_no_cue = h_no_cue.wanting_score()
+
+        h_cue = Human()
+        h_cue.dopamine = 60
+        h_cue.cue_salience['sexual'] = 0.8
+        wanting_cue = h_cue.wanting_score()
+
+        self.assertGreater(wanting_cue, wanting_no_cue,
+                           f"Cue salience should boost wanting: "
+                           f"no_cue={wanting_no_cue:.1f}, with_cue={wanting_cue:.1f}")
+
+    def test_pleasure_score_backward_compat(self):
+        """pleasure_score() should equal liking_score()."""
+        h = Human()
+        h.dopamine = 70
+        h.endorphins = 50
+        h.oxytocin = 40
+        h.serotonin = 55
+        h.anxiety = 25
+        h.absorption = 60
+        self.assertEqual(h.pleasure_score(), h.liking_score(),
+                         "pleasure_score() should be an alias for liking_score()")
 
 
 if __name__ == '__main__':

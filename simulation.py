@@ -19,7 +19,7 @@ def physiology_to_emoji(human: Human) -> str:
     Map the human's physiological state to an emoji representation.
     Returns an emoji that best represents the overall state.
     """
-    pleasure = human.pleasure_score()
+    pleasure = human.liking_score()
 
     # Check critical states first
     if not human.is_viable():
@@ -85,7 +85,8 @@ def format_status(human: Human, action: str = None, time: float = 0.0) -> str:
     Format a status string showing action, attributes summary, and emoji.
     """
     emoji = physiology_to_emoji(human)
-    pleasure = human.pleasure_score()
+    liking = human.liking_score()
+    wanting = human.wanting_score()
 
     lines = []
 
@@ -94,7 +95,7 @@ def format_status(human: Human, action: str = None, time: float = 0.0) -> str:
         lines.append(f"\n{'='*50}")
         lines.append(f"  {emoji} Acción: {action}")
     lines.append(f"{'='*50}")
-    lines.append(f"  Tiempo: {time:.1f}h | Placer: {pleasure:.1f} | {emoji}")
+    lines.append(f"  Tiempo: {time:.1f}h | Gustar: {liking:.1f} | Querer: {wanting:.1f} | {emoji}")
     lines.append(f"{'='*50}")
 
     # Traits (only show non-default)
@@ -203,6 +204,7 @@ class Simulation:
         current_time = 0.0
         event_index = 0
         total_pleasure = 0.0
+        total_wanting = 0.0
         time_steps = 0
         timeline = []
         viable = True
@@ -232,8 +234,9 @@ class Simulation:
                             if not human.is_viable():
                                 viable = False
                                 break
-                            pleasure = human.pleasure_score()
+                            pleasure = human.liking_score()
                             total_pleasure += pleasure * dt
+                            total_wanting += human.wanting_score() * dt
                             current_time += dt
                             time_steps += 1
                             timeline.append((current_time, pleasure, current_event))
@@ -258,8 +261,9 @@ class Simulation:
                 viable = False
                 break
 
-            pleasure = human.pleasure_score()
+            pleasure = human.liking_score()
             total_pleasure += pleasure * self.time_step
+            total_wanting += human.wanting_score() * self.time_step
             time_steps += 1
             current_time += self.time_step
 
@@ -270,10 +274,13 @@ class Simulation:
             timeline.append((current_time, pleasure, None))
 
         avg_pleasure = total_pleasure / max(current_time, 0.01)
+        avg_wanting = total_wanting / max(current_time, 0.01)
 
         return {
             'total_pleasure': total_pleasure,
             'avg_pleasure': avg_pleasure,
+            'total_wanting': total_wanting,
+            'avg_wanting': avg_wanting,
             'final_state': human,
             'timeline': timeline,
             'viable': viable,
@@ -324,7 +331,7 @@ def interactive_mode():
 
         print(f"\n   0. Salir del juego")
         print("-" * 40)
-        print(f"  Tiempo actual: {current_time:.1f}h | Placer acumulado: {total_pleasure:.1f}")
+        print(f"  Tiempo actual: {current_time:.1f}h | Gustar acum.: {total_pleasure:.1f}")
 
         # Get user input
         try:

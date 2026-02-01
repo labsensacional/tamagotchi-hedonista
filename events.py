@@ -518,6 +518,13 @@ def apply_decay(human: Human, dt: float):
     if human.vasopressin > 50 and human.oxytocin > 30:
         human.oxytocin -= (human.vasopressin - 50) * 0.02 * dt
 
+    # === SEROTONIN EFFECTS ===
+    # High serotonin promotes wellbeing but also raises prolactin and suppresses dopamine
+    if human.serotonin > 60:
+        sero_factor = (human.serotonin - 60) / 40  # 0 to 1
+        human.prolactin += sero_factor * 3 * dt     # serotonin drives prolactin release
+        human.dopamine -= sero_factor * 4 * dt      # serotonin suppresses dopamine peaks
+
     # === D. Consequences of extreme states ===
     if human.dopamine > 85:
         human.psychological_health -= (human.dopamine - 85) * 0.1 * dt
