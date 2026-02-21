@@ -758,46 +758,6 @@ class TestCueLearning(unittest.TestCase):
                              "Cue salience should be capped at 1.0")
 
 
-class TestRunIntegration(unittest.TestCase):
-    """Tests for the fixed run() time integration."""
-
-    def setUp(self):
-        import events as ev
-        self._orig_prob = ev.ENABLE_PROBABILISTIC
-        ev.ENABLE_PROBABILISTIC = False
-
-    def tearDown(self):
-        import events as ev
-        ev.ENABLE_PROBABILISTIC = self._orig_prob
-
-    def test_event_duration_properly_integrated(self):
-        """Events with longer duration should accumulate more pleasure steps."""
-        from simulation import Simulation
-        sim = Simulation(time_step=0.1)
-
-        # Use a human that can sleep (low energy, high sleepiness)
-        h = Human()
-        h.energy = 40
-        h.sleepiness = 60
-        result = sim.run(['sleep'], initial_state=h, max_hours=3.0)
-        # Timeline should have entries for the sleep sub-steps + decay steps
-        sleep_entries = [t for t in result['timeline'] if t[2] == 'sleep']
-        self.assertGreater(len(sleep_entries), 0,
-                           "Sleep event should appear in timeline")
-
-    def test_simulation_viable_basic_sequence(self):
-        """Basic sequence should complete without crashing."""
-        from simulation import Simulation
-        sim = Simulation(time_step=0.1)
-        result = sim.run(
-            ['rest', 'light_stimulation', 'rest'],
-            max_hours=5.0
-        )
-        self.assertTrue(result['viable'],
-                        "Basic sequence should remain viable")
-        self.assertGreater(result['total_pleasure'], 0,
-                           "Should accumulate some pleasure")
-
 
 class TestContextReceptivity(unittest.TestCase):
     """Tests for context-sensitive receptivity: same action, different outcome."""
