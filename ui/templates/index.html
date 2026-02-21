@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Tamagotchi Hedonista</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Tone.js for procedural audio -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+</head>
+<body>
+<div id="app">
+
+    <!-- ── Avatar section ──────────────────────────────── -->
+    <div id="avatar-section">
+        <div id="bg"></div>
+
+        <button id="reset-btn" onclick="resetGame()">↺ reset</button>
+
+        <!-- HUD bars: liking / anxiety / energy -->
+        <div id="hud">
+            <div class="hud-row">
+                <span class="hud-label">♥</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-liking" style="--color:#ff9f43"></div>
+                </div>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">⚡</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-anxiety" style="--color:#ee5a24"></div>
+                </div>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">✦</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-energy" style="--color:#00b894"></div>
+                </div>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">◎</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-arousal" style="--color:#a29bfe"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avatar (base silhouette + expression overlay) -->
+        <div class="avatar-container anim-idle" id="avatar-container">
+            <img class="avatar-layer" id="avatar-base" src="/static/avatar/base.png" alt="avatar">
+            <img class="avatar-layer" id="avatar-expr" src="/static/avatar/expr_neutral.png" alt="expression">
+        </div>
+
+        <!-- Audio toggle -->
+        <button id="audio-btn" onclick="toggleAudio()" title="Toggle sound">🔇</button>
+    </div>
+
+    <!-- ── Recent actions strip ─────────────────────────── -->
+    <div id="recent-actions">
+        <span class="recent-label">recent:</span>
+    </div>
+
+    <!-- ── Controls panel ───────────────────────────────── -->
+    <div id="controls">
+        <div id="search-wrap">
+            <input id="search-input" type="text"
+                   placeholder="🔍 search actions..."
+                   autocomplete="off"
+                   autocorrect="off"
+                   spellcheck="false">
+        </div>
+        <div id="action-area">
+            <!-- populated by JS -->
+        </div>
+    </div>
+
+</div><!-- #app -->
+<script src="/static/main.js"></script>
+</body>
+</html>

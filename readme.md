@@ -89,6 +89,56 @@ If a refactor breaks a test, it means a theory was violated.
             - Hay animaciones y sonidos para cada accion. Quizas eventualmente pueden ir cambiando
             - El personaje es algo tierno que atrapa. Quizas eventualmente se podria personalizar?
 
+## Project structure
+
+```
+repo/
+├── readme.md
+├── internal-logic/       # Simulation engine (pure Python, no dependencies)
+│   ├── human.py          # Human dataclass: neurotransmitters, state variables, scores
+│   ├── events.py         # All events/actions + decay, tolerance, receptivity logic
+│   ├── simulation.py     # Simulation runner utility
+│   └── tests.py          # Axiom-based test suite (run: python tests.py)
+└── ui/                   # Web interface
+    ├── app.py            # Flask server — imports internal-logic, exposes REST API
+    ├── requirements.txt  # flask, Pillow
+    ├── generate_placeholders.py  # Creates mock avatar/background images
+    ├── templates/
+    │   └── index.html    # Single-page mobile-first UI
+    └── static/
+        ├── style.css     # Layout, animations (shake/sway/bounce/droop/...)
+        ├── main.js       # UI logic + Tone.js procedural audio
+        ├── avatar/       # base.png + expr_*.png (replace with your art)
+        └── backgrounds/  # category/action background images (replace with your art)
+```
+
+## Running the UI
+
+```bash
+cd ui
+pip install -r requirements.txt
+python generate_placeholders.py   # only needed once, or after adding new backgrounds
+python app.py                     # serves at http://localhost:5000
+```
+
+Also accessible from a phone on the same network at `http://<your-local-ip>:5000`.
+
+## UI overview
+
+The interface is split into two areas:
+
+**Top (avatar section):** a layered PNG avatar whose expression and animation reflect the current state — anxious states trigger a shake animation, sleepiness causes a drooping slow bob, high liking triggers a bounce or sway. A HUD in the corner shows liking, anxiety, energy, and arousal as small bars. The background image fades to match the last action taken.
+
+**Bottom (controls):** a search bar, a category grid (sexual / social / pain / breathwork / food / rest / drugs / medical / life), and a recent-actions strip. Tapping a category drills into its action list; the search bar filters across all actions in real time.
+
+**Audio:** Tone.js procedural ambient pads (slow attack/release, no arpeggios). The chord progression, BPM, low-pass filter cutoff, distortion, and reverb wetness all modulate continuously from the current state — sleepiness muffles and slows everything, anxiety adds distortion and speeds the chord changes, shutdown collapses to near silence with heavy reverb. A short SFX tone plays on each action.
+
+## Replacing placeholder assets
+
+- `ui/static/avatar/base.png` — body silhouette, no expression, transparent background
+- `ui/static/avatar/expr_<name>.png` — expression overlays: `neutral`, `happy`, `ecstatic`, `sad`, `anxious`, `sleepy`, `blank`
+- `ui/static/backgrounds/<key>.jpg` — one per category (`sexual`, `social`, `pain`, `breathwork`, `food`, `rest`, `sleep`, `drugs`, `medical`, `life`, `default`). Add per-action overrides by mapping action names in `ACTION_BG` in `main.js`.
+
 ## Ideas a futuro
 
 Si se inicializa un sistema basico con muchos agentes en un espacio 2D y se implementan dinamicas como
@@ -183,3 +233,16 @@ Some useful concepts below. Besides that this [google slide](https://docs.google
 
 - Self-organized criticality
 
+#### Mas cosas
+
+- Opponent-Process Theory (Solomon & Corbit)                                                                                                                                       
+- Gate Control Theory of Pain (Melzack & Wall)                                                                                                                                     
+- Neuromatrix Theory of Pain (Melzack)                                                                                                                                             
+- Incentive Salience / “wanting vs liking” (Berridge & Robinson)                                                                                                                   
+- Dual Control Model of sexual response (Bancroft & Janssen)                                                                                                                       
+- Window of Tolerance (Siegel / Ogden)                                                                                                                                             
+- Polyvagal Theory (Porges)                                                                                                                                                        
+- Affective systems: SEEKING/PLAY/PANIC/LUST etc. (Panksepp)                                                                                                                       
+- Benign Violation Theory (McGraw & Warren) — if relevant                                                                                                                          
+- Predictive processing / allostasis framing (Sterling; Friston; Barrett) — if useful as integration glue                                                                          
+- Dynamical systems / attractor models (Kelso; Thelen; Marc Lewis)    

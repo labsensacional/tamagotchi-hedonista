@@ -216,6 +216,11 @@ def compute_receptivity(human: Human, category: str) -> float:
         # Absorption helps (being in the moment)
         if human.absorption > 30:
             r += (human.absorption - 30) / 70 * 0.2
+        # DCM: Sexual Inhibition System (SIS) — the "brake", independent of anxiety.
+        # High SIS means the response is blocked even if desire (SES/arousal) is present.
+        # This produces mind-body dissociation: wanting without ability to respond.
+        if human.sexual_inhibition > 20:
+            r -= (human.sexual_inhibition - 20) / 80 * 0.8
 
     elif category == 'social':
         # High anxiety makes socializing aversive
@@ -264,6 +269,12 @@ def compute_receptivity(human: Human, category: str) -> float:
         stress_pct = human.life_stress / 100.0
         r -= stress_pct * 0.3
 
+    # WoT: Shutdown (dorsal vagal) flattens receptivity for all categories.
+    # Unlike anxiety (which creates aversion), shutdown creates indifference —
+    # nothing registers, positively or negatively.
+    if human.shutdown > 20:
+        r -= (human.shutdown - 20) / 80 * 0.6
+
     return max(-0.5, min(1.0, r))
 
 
@@ -279,6 +290,8 @@ def apply_backfire(human: Human, category: str, severity: float):
         human.anxiety += severity * 20
         human.absorption -= severity * 15
         human.prefrontal += severity * 10  # rumination, self-monitoring
+        # DCM: failed sexual attempts strongly reinforce the SIS brake
+        human.sexual_inhibition += severity * 30
 
     elif category == 'social':
         # Social interaction while panicking → social anxiety spiral
@@ -307,6 +320,8 @@ def apply_backfire(human: Human, category: str, severity: float):
         human.anxiety += severity * 30
         human.psychological_health -= severity * 4
         human.absorption -= severity * 15
+        # WoT: severe overwhelm can flip into dorsal shutdown (collapse after panic)
+        human.shutdown += severity * 50
 
 
 def apply_event(human: Human, event_name: str, event: 'Event'):
@@ -525,6 +540,26 @@ def apply_decay(human: Human, dt: float):
         human.prolactin += sero_factor * 3 * dt     # serotonin drives prolactin release
         human.dopamine -= sero_factor * 4 * dt      # serotonin suppresses dopamine peaks
 
+    # === DCM: Sexual Inhibition System (SIS) decay ===
+    # SIS builds when prefrontal is high during sexual arousal (self-monitoring,
+    # performance concern). Decays linearly toward 0 — performance anxiety fades
+    # with time and especially with sleep.
+    if human.arousal > 40 and human.prefrontal > 55:
+        sis_build = ((human.arousal - 40) / 60) * ((human.prefrontal - 55) / 45)
+        human.sexual_inhibition += sis_build * 5 * dt
+    human.sexual_inhibition = max(0.0, human.sexual_inhibition - 10 * dt)
+
+    # === WoT: Shutdown (dorsal vagal) dynamics ===
+    # Activates passively when anxiety is extreme AND energy is nearly depleted
+    # (overwhelm + depletion = collapse). Also triggered acutely by severe backfires.
+    if human.anxiety > 80 and human.energy < 25:
+        human.shutdown += (human.anxiety - 80) / 20 * 3 * dt
+    # Shutdown suppresses absorption (flatness blocks immersion)
+    if human.shutdown > 30:
+        human.absorption -= (human.shutdown - 30) / 70 * 3 * dt
+    # Shutdown decays slowly — can last hours without sleep
+    human.shutdown = max(0.0, human.shutdown - 6 * dt)
+
     # === D. Consequences of extreme states ===
     if human.dopamine > 85:
         human.psychological_health -= (human.dopamine - 85) * 0.1 * dt
@@ -633,6 +668,9 @@ def make_events() -> dict[str, Event]:
         # Sleep reduces cue salience slightly
         for cat in h.cue_salience:
             h.cue_salience[cat] = max(0.0, h.cue_salience[cat] - 0.05)
+        # Sleep clears performance anxiety and partially resolves dorsal shutdown
+        h.sexual_inhibition = 0.0
+        h.shutdown = max(0.0, h.shutdown - 40.0)
 
     events['sleep'] = Event(
         name='sleep',

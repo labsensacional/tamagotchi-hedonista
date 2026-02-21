@@ -73,6 +73,19 @@ class Human:
     edging_buildup: float = 0.0     # accumulated arousal without release
     digesting: float = 0.0          # post-meal digestion state (causes drowsiness)
 
+    # === DUAL CONTROL MODEL (Bancroft & Janssen) ===
+    # Sexual response is governed by two independent systems.
+    # arousal already acts as a proxy for SES (excitation / "gas pedal").
+    # sexual_inhibition is the SIS ("brake"): builds from self-monitoring and
+    # performance anxiety; operates independently of arousal.
+    sexual_inhibition: float = 0.0  # 0 = no brake, 100 = full inhibition
+
+    # === WINDOW OF TOLERANCE / POLYVAGAL (Siegel / Porges) ===
+    # When overwhelmed beyond threshold, the system can flip into dorsal vagal
+    # shutdown: flatness, numbing, anhedonia — distinct from the hyperarousal
+    # (high anxiety) failure mode. Blocks all valence, not just positive.
+    shutdown: float = 0.0           # 0 = normal, 100 = full dorsal collapse
+
     # === PHYSIOLOGICAL REALISM ===
     tolerance: dict = field(default_factory=lambda: {
         'sexual': 0.0, 'pain': 0.0, 'social': 0.0,
@@ -158,7 +171,11 @@ class Human:
         max_bonus = 0.3 * (1 - ssri_pct * 0.5)
         absorption_factor = 1.0 + (self.absorption / 100) * max_bonus
 
-        return base_liking * anxiety_factor * absorption_factor
+        # Shutdown (dorsal vagal): numbs all valence — not pain, not pleasure.
+        # Distinct from anxiety: doesn't modulate, just flattens.
+        shutdown_factor = 1.0 - (self.shutdown / 100) * 0.8
+
+        return base_liking * anxiety_factor * absorption_factor * shutdown_factor
 
     def wanting_score(self) -> float:
         """
@@ -183,7 +200,10 @@ class Human:
         # At energy=100: no suppression. At energy=0: 40% suppression.
         energy_factor = 0.6 + (self.energy / 100) * 0.4
 
-        return base_wanting * prolactin_factor * energy_factor
+        # Shutdown also collapses drive — dorsal state = no wanting either
+        shutdown_factor = 1.0 - (self.shutdown / 100) * 0.6
+
+        return base_wanting * prolactin_factor * energy_factor * shutdown_factor
 
     def pleasure_score(self) -> float:
         """
