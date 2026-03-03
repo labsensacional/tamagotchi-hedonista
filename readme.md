@@ -4,6 +4,8 @@ sensagotchi (_sensations watch_) is a small simulation framework for modeling li
 
 It treats actions like “jerking off”, “going to a party”, “losing your job”, or “receiving light pain” not as narrative events, but as perturbations to a physiological–affective system that evolves over time.
 
+_Try it [here](https://sensagotchi.labsensacional.com/)!_
+
 ## What is this for?
 
 The main use case is to explore how **sequences of actions** (not single actions) shape subjective experience over time.
@@ -58,7 +60,7 @@ npm test
 
 #### Emotional Expression Test
 
-You can open `src/static/emotions-expression-test.html` to manually test this.
+You can open `src/static/emotions-expression-test.html` to manually test this. Or try the latest release [here](https://sensagotchi.labsensacional.com/emotions-expression-test)
 
 ## Future Work
 
