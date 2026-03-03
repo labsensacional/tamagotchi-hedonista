@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Sensagotchi</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a14">
     <link rel="stylesheet" href="style.css">
     <!-- p5.js for procedural avatar -->
     <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
@@ -21,45 +23,45 @@
         <button id="reset-btn" onclick="resetGame()">↺ reset</button>
         <a id="lab-btn" href="emotions-expression-test.html">lab →</a>
 
-        <!-- HUD bars: liking / anxiety / energy (hover for full detail) -->
-        <div id="hud">
+        <!-- HUD bars: tap anywhere to toggle detail panel -->
+        <div id="hud" onclick="this.classList.toggle('open')">
             <div class="hud-row">
-                <span class="hud-label" data-tip="liking">♥</span>
+                <span class="hud-label" data-tip="liking">😊</span>
                 <div class="hud-track">
                     <div class="hud-fill" id="hud-liking" style="--color:#ff9f43"></div>
                 </div>
             </div>
             <div class="hud-row">
-                <span class="hud-label" data-tip="anxiety">⚡</span>
-                <div class="hud-track">
-                    <div class="hud-fill" id="hud-anxiety" style="--color:#ee5a24"></div>
-                </div>
-            </div>
-            <div class="hud-row">
-                <span class="hud-label" data-tip="energy">✦</span>
-                <div class="hud-track">
-                    <div class="hud-fill" id="hud-energy" style="--color:#00b894"></div>
-                </div>
-            </div>
-            <div class="hud-row">
-                <span class="hud-label" data-tip="arousal">◎</span>
+                <span class="hud-label" data-tip="arousal">🔥</span>
                 <div class="hud-track">
                     <div class="hud-fill" id="hud-arousal" style="--color:#a29bfe"></div>
                 </div>
             </div>
             <div class="hud-row">
-                <span class="hud-label" data-tip="sleepiness">☽</span>
+                <span class="hud-label" data-tip="energy">⚡</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-energy" style="--color:#00b894"></div>
+                </div>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label" data-tip="hunger">🍔</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-hunger" style="--color:#e67e22"></div>
+                </div>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label" data-tip="sleepiness">😴</span>
                 <div class="hud-track">
                     <div class="hud-fill" id="hud-sleepiness" style="--color:#636e72"></div>
                 </div>
             </div>
             <div class="hud-row">
-                <span class="hud-label" data-tip="hunger">◇</span>
+                <span class="hud-label" data-tip="anxiety">😰</span>
                 <div class="hud-track">
-                    <div class="hud-fill" id="hud-hunger" style="--color:#e67e22"></div>
+                    <div class="hud-fill" id="hud-anxiety" style="--color:#ee5a24"></div>
                 </div>
             </div>
-            <!-- Detail panel: visible on hover -->
+            <!-- Detail panel: tap HUD to toggle -->
             <div id="hud-detail"></div>
         </div>
 
@@ -94,5 +96,10 @@
 </div><!-- #app -->
 <script src="monster.js"></script>
 <script src="main.js" type="module"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
 </body>
 </html>
