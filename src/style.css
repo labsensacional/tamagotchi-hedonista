@@ -32,7 +32,7 @@ html, body {
 /* ── Avatar section (top ~60%) ───────────────────────────── */
 
 #avatar-section {
-    flex: 0 0 60%;
+    flex: 0 0 45%;
     position: relative;
     overflow: hidden;
     background: var(--bg);
@@ -373,7 +373,8 @@ html, body {
     -webkit-tap-highlight-color: transparent;
 }
 .action-item:active          { background: rgba(255,255,255,0.15); transform: scale(0.98); }
-.action-item.disabled        { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+.action-item.disabled        { opacity: 0.5; cursor: default; }
+.action-blocked-reason { font-size: 10px; color: #e17055; margin-top: 3px; font-style: italic; }
 
 .action-name {
     font-size: 13px;
@@ -420,7 +421,7 @@ html, body {
 
 #lab-btn {
     position: absolute;
-    bottom: 10px;
+    top: 40px;
     left: 10px;
     background: rgba(0,0,0,0.45);
     border: 1px solid var(--border);

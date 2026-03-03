@@ -195,11 +195,13 @@ function events_by_category() {
     for (const [name, event] of Object.entries(_events)) {
         const cat = event.category;
         if (!cats[cat]) cats[cat] = [];
+        const reason = event.blocked_reason;
         cats[cat].push({
             name,
-            description: event.description,
-            duration:    event.duration,
-            can_apply:   event.can_apply(_human),
+            description:    event.description,
+            duration:       event.duration,
+            can_apply:      event.can_apply(_human),
+            blocked_reason: typeof reason === 'function' ? reason(_human) : (reason || ''),
         });
     }
     return cats;
@@ -261,6 +263,7 @@ function renderActionList(actions, showBack) {
             <div class="action-name">${a.name.replace(/_/g, ' ')}</div>
             <div class="action-desc">${a.description}</div>
             <div class="action-dur">${a.duration}h</div>
+            ${!a.can_apply && a.blocked_reason ? `<div class="action-blocked-reason">⚠ ${a.blocked_reason}</div>` : ''}
         </div>`).join('');
     area.innerHTML = `${back}<div class="action-list">${items}</div>`;
 }

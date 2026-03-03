@@ -654,13 +654,14 @@ export class Event {
    * An event/action that can be applied to a Human.
    * apply takes (human, effectiveness) where effectiveness is 0.4-1.0.
    */
-  constructor(name, duration, applyFn, category = 'rest', canApply = (_h) => true, description = '') {
+  constructor(name, duration, applyFn, category = 'rest', canApply = (_h) => true, description = '', blockedReason = '') {
     this.name = name;
     this.duration = duration;
     this.apply = applyFn;
     this.category = category;
     this.can_apply = canApply;
     this.description = description;
+    this.blocked_reason = blockedReason;
   }
 }
 
@@ -687,7 +688,8 @@ export function make_events() {
     snack,
     'food',
     (h) => h.hunger > 10,
-    'Have a light snack'
+    'Have a light snack',
+    'not hungry'
   );
 
   function eat(h, eff = 1.0) {
@@ -709,7 +711,8 @@ export function make_events() {
     eat,
     'food',
     (h) => h.hunger > 25,
-    'Eat a full meal (causes drowsiness)'
+    'Eat a full meal (causes drowsiness)',
+    'not hungry enough'
   );
 
   function sleep(h, eff = 1.0) {
@@ -753,7 +756,8 @@ export function make_events() {
     sleep,
     'rest',
     (h) => h.energy < 60 || h.sleepiness > 50,
-    'Take a restful nap'
+    'Take a restful nap',
+    'not tired enough'
   );
 
   // --- Sexual/arousal events ---
@@ -803,7 +807,8 @@ export function make_events() {
     intense_stimulation,
     'sexual',
     (h) => h.arousal > 30,
-    'Intense sexual stimulation'
+    'Intense sexual stimulation',
+    'need more arousal first'
   );
 
   function edging(h, eff = 1.0) {
@@ -828,7 +833,8 @@ export function make_events() {
     edging,
     'sexual',
     (h) => h.arousal > 50,
-    'Edge - maintain high arousal without release'
+    'Edge - maintain high arousal without release',
+    'need higher arousal'
   );
 
   orgasm = function(h, eff = 1.0) {
@@ -883,7 +889,8 @@ export function make_events() {
     orgasm,
     'sexual',
     can_orgasm,
-    'Orgasm - character depends on vasopressin/oxytocin balance'
+    'Orgasm - character depends on vasopressin/oxytocin balance',
+    (h) => h.prolactin >= 30 ? 'refractory period (prolactin high)' : 'need more arousal'
   );
 
   // --- Pain/adrenaline (small doses enhance pleasure) ---
@@ -1007,7 +1014,8 @@ export function make_events() {
     cold_face_immersion,
     'breathwork',
     (h) => h.energy > 10,
-    'Cold water face immersion - mammalian dive reflex'
+    'Cold water face immersion - mammalian dive reflex',
+    'too exhausted'
   );
 
   function holotropic_breathing(h, eff = 1.0) {
@@ -1028,7 +1036,8 @@ export function make_events() {
     holotropic_breathing,
     'breathwork',
     (h) => h.energy > 30,
-    'Intense holotropic breathwork'
+    'Intense holotropic breathwork',
+    'need more energy'
   );
 
   // --- Rest/recovery ---
@@ -1087,7 +1096,8 @@ export function make_events() {
     mdma,
     'drugs',
     (h) => h.energy > 30,
-    'MDMA - empathogenic serotonin/oxytocin release'
+    'MDMA - empathogenic serotonin/oxytocin release',
+    'need more energy (costs 25)'
   );
 
   function weed(h, eff = 1.0) {
@@ -1106,7 +1116,8 @@ export function make_events() {
     weed,
     'drugs',
     (h) => h.energy > 20,
-    'Cannabis - relaxation, absorption, munchies'
+    'Cannabis - relaxation, absorption, munchies',
+    'need more energy'
   );
 
   function mushrooms(h, eff = 1.0) {
@@ -1131,7 +1142,8 @@ export function make_events() {
     mushrooms,
     'drugs',
     (h) => h.energy > 30,
-    'Psilocybin - deep absorption, risk of bad trip'
+    'Psilocybin - deep absorption, risk of bad trip',
+    'need more energy (costs 10)'
   );
 
   function lsd(h, eff = 1.0) {
@@ -1157,7 +1169,8 @@ export function make_events() {
     lsd,
     'drugs',
     (h) => h.energy > 30,
-    'LSD - long absorption boost, risk of bad trip'
+    'LSD - long absorption boost, risk of bad trip',
+    'need more energy (costs 15)'
   );
 
   function poppers(h, eff = 1.0) {
@@ -1175,7 +1188,8 @@ export function make_events() {
     poppers,
     'drugs',
     (h) => h.energy > 20,
-    'Poppers - brief vasodilation, arousal spike'
+    'Poppers - brief vasodilation, arousal spike',
+    'need more energy'
   );
 
   function ketamine(h, eff = 1.0) {
@@ -1195,7 +1209,8 @@ export function make_events() {
     ketamine,
     'drugs',
     (h) => h.energy > 20,
-    'Ketamine - dissociative, absorption, pain relief'
+    'Ketamine - dissociative, absorption, pain relief',
+    'need more energy'
   );
 
   function tobacco(h, eff = 1.0) {
@@ -1212,7 +1227,8 @@ export function make_events() {
     tobacco,
     'drugs',
     (h) => h.energy > 20,
-    'Tobacco - mild stimulant, brief anxiety relief'
+    'Tobacco - mild stimulant, brief anxiety relief',
+    'need more energy'
   );
 
   function caffeine(h, eff = 1.0) {
@@ -1256,7 +1272,8 @@ export function make_events() {
     alcohol,
     'drugs',
     (h) => h.energy > 15,
-    'Alcohol - anxiolytic, disinhibition'
+    'Alcohol - anxiolytic, disinhibition',
+    'need more energy'
   );
 
   function amphetamines(h, eff = 1.0) {
@@ -1276,7 +1293,8 @@ export function make_events() {
     amphetamines,
     'drugs',
     (h) => h.energy > 20,
-    'Amphetamines - strong stimulant, dopamine surge'
+    'Amphetamines - strong stimulant, dopamine surge',
+    'need more energy'
   );
 
   function cocaine(h, eff = 1.0) {
@@ -1298,7 +1316,8 @@ export function make_events() {
     cocaine,
     'drugs',
     (h) => h.energy > 20,
-    'Cocaine - intense short dopamine spike, harsh crash'
+    'Cocaine - intense short dopamine spike, harsh crash',
+    'need more energy'
   );
 
   function nitrous(h, eff = 1.0) {
@@ -1315,7 +1334,8 @@ export function make_events() {
     nitrous,
     'drugs',
     (h) => h.energy > 20,
-    'Nitrous oxide - brief euphoria, dissociation'
+    'Nitrous oxide - brief euphoria, dissociation',
+    'need more energy'
   );
 
   // --- Medical events ---
@@ -1349,7 +1369,8 @@ export function make_events() {
     stop_ssri,
     'medical',
     (h) => h.ssri_level > 10,
-    'Stop SSRI medication (withdrawal)'
+    'Stop SSRI medication (withdrawal)',
+    'not on SSRIs'
   );
 
   function testosterone_injection(h, eff = 1.0) {
@@ -1382,7 +1403,8 @@ export function make_events() {
     anti_androgen,
     'medical',
     (h) => h.testosterone > 10,
-    'Anti-androgen medication'
+    'Anti-androgen medication',
+    'testosterone already low'
   );
 
   function therapy_session(h, eff = 1.0) {
@@ -1418,7 +1440,8 @@ export function make_events() {
     job_loss,
     'life',
     (h) => h.life_stress < 80,
-    'Job loss'
+    'Job loss',
+    'already too stressed'
   );
 
   function financial_crisis(h, eff = 1.0) {
@@ -1434,7 +1457,8 @@ export function make_events() {
     financial_crisis,
     'life',
     (h) => h.life_stress < 85,
-    'Financial crisis'
+    'Financial crisis',
+    'already too stressed'
   );
 
   function breakup(h, eff = 1.0) {
@@ -1468,7 +1492,8 @@ export function make_events() {
     get_job,
     'life',
     (h) => h.life_stress > 15,
-    'Get a new job'
+    'Get a new job',
+    'life stress already low'
   );
 
   function resolve_finances(h, eff = 1.0) {
@@ -1484,7 +1509,8 @@ export function make_events() {
     resolve_finances,
     'life',
     (h) => h.life_stress > 10,
-    'Resolve financial issues'
+    'Resolve financial issues',
+    'no financial stress to resolve'
   );
 
   function new_relationship(h, eff = 1.0) {
