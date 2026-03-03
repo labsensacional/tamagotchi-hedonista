@@ -113,7 +113,6 @@ html, body {
     transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-#hud:hover #hud-detail,
 #hud.open #hud-detail {
     opacity: 1;
     transform: translateX(0);
