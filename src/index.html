@@ -44,33 +44,9 @@
         <!-- HUD bars: tap anywhere to toggle detail panel -->
         <div id="hud" onclick="this.classList.toggle('open'); event.stopPropagation()">
             <div class="hud-row">
-                <span class="hud-label" data-tip="liking">😊</span>
-                <div class="hud-track">
-                    <div class="hud-fill" id="hud-liking" style="--color:#ff9f43"></div>
-                </div>
-            </div>
-            <div class="hud-row">
-                <span class="hud-label" data-tip="arousal">🔥</span>
-                <div class="hud-track">
-                    <div class="hud-fill" id="hud-arousal" style="--color:#a29bfe"></div>
-                </div>
-            </div>
-            <div class="hud-row">
-                <span class="hud-label" data-tip="energy">⚡</span>
-                <div class="hud-track">
-                    <div class="hud-fill" id="hud-energy" style="--color:#00b894"></div>
-                </div>
-            </div>
-            <div class="hud-row">
                 <span class="hud-label" data-tip="hunger">🍔</span>
                 <div class="hud-track">
                     <div class="hud-fill" id="hud-hunger" style="--color:#e67e22"></div>
-                </div>
-            </div>
-            <div class="hud-row">
-                <span class="hud-label" data-tip="sleepiness">😴</span>
-                <div class="hud-track">
-                    <div class="hud-fill" id="hud-sleepiness" style="--color:#636e72"></div>
                 </div>
             </div>
             <div class="hud-row">
@@ -79,9 +55,37 @@
                     <div class="hud-fill" id="hud-anxiety" style="--color:#ee5a24"></div>
                 </div>
             </div>
+            <div class="hud-row">
+                <span class="hud-label" data-tip="sleepiness">😴</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-sleepiness" style="--color:#636e72"></div>
+                </div>
+            </div>
+            <div class="hud-spacer"></div>
+            <div class="hud-row">
+                <span class="hud-label" data-tip="psychological health">🧠</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-psych" style="--color:#a29bfe"></div>
+                </div>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label" data-tip="physical health">❤️</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-physical" style="--color:#ff7675"></div>
+                </div>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label" data-tip="energy">⚡</span>
+                <div class="hud-track">
+                    <div class="hud-fill" id="hud-energy" style="--color:#00b894"></div>
+                </div>
+            </div>
             <!-- Detail panel: tap HUD to toggle -->
             <div id="hud-detail"></div>
         </div>
+
+        <!-- Event notification overlay -->
+        <div id="event-notification"></div>
 
         <!-- Avatar (p5.js procedural monster) -->
         <div class="avatar-container anim-idle" id="avatar-container">
@@ -108,6 +112,15 @@
         </div>
         <div id="action-area">
             <!-- populated by JS -->
+        </div>
+    </div>
+
+    <!-- ── Death screen ─────────────────────────────────── -->
+    <div id="death-screen" class="hidden">
+        <div id="death-content">
+            <div id="death-skull">☠</div>
+            <div id="death-msg">you died</div>
+            <button id="death-reset" onclick="resetGame()">↺ start over</button>
         </div>
     </div>
 

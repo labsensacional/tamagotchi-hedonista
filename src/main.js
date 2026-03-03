@@ -3,7 +3,7 @@
    ============================================================= */
 
 import { Human, create_human } from './internal-logic/human.js';
-import { make_events, apply_event, apply_decay } from './internal-logic/events.js';
+import { make_events, apply_event, apply_decay, drainNotifications } from './internal-logic/events.js';
 
 // ── State ──────────────────────────────────────────────────────
 let currentState   = null;
@@ -63,6 +63,7 @@ const ACTION_BG = {
     therapy_session:      'medical',
     testosterone_injection:'medical',
     anti_androgen:        'medical',
+    exercise:             'life',
     job_loss:             'life',
     financial_crisis:     'life',
     breakup:              'life',
@@ -99,12 +100,12 @@ function updateAvatar(s) {
 
 function updateHUD(s) {
     const bars = [
-        { id: 'hud-liking',    val: s.liking_score },
-        { id: 'hud-anxiety',   val: s.anxiety      },
-        { id: 'hud-energy',    val: s.energy       },
-        { id: 'hud-arousal',   val: s.arousal      },
-        { id: 'hud-sleepiness',val: s.sleepiness   },
-        { id: 'hud-hunger',    val: s.hunger       },
+        { id: 'hud-hunger',    val: s.hunger              },
+        { id: 'hud-anxiety',   val: s.anxiety             },
+        { id: 'hud-sleepiness',val: s.sleepiness          },
+        { id: 'hud-psych',     val: s.psychological_health},
+        { id: 'hud-physical',  val: s.physical_health     },
+        { id: 'hud-energy',    val: s.energy              },
     ];
     bars.forEach(({ id, val }) => {
         const el = $(id);
@@ -115,11 +116,12 @@ function updateHUD(s) {
 
 // Color per field (CSS custom property --dc on .detail-fill)
 const DETAIL_COLORS = {
-    dopamine:    '#fdcb6e', serotonin:   '#55efc4', endorphins:  '#fd79a8',
-    oxytocin:    '#74b9ff', prolactin:   '#a29bfe', vasopressin: '#e17055',
-    arousal:     '#a29bfe', energy:      '#00b894', sleepiness:  '#636e72',
-    hunger:      '#e67e22', anxiety:     '#ee5a24', prefrontal:  '#0984e3',
-    absorption:  '#6c5ce7', shutdown:    '#2d3436',
+    dopamine:             '#fdcb6e', serotonin:            '#55efc4', endorphins:  '#fd79a8',
+    oxytocin:             '#74b9ff', prolactin:            '#a29bfe', vasopressin: '#e17055',
+    arousal:              '#a29bfe', energy:               '#00b894', sleepiness:  '#636e72',
+    hunger:               '#e67e22', anxiety:              '#ee5a24', prefrontal:  '#0984e3',
+    absorption:           '#6c5ce7', shutdown:             '#2d3436',
+    physical_health:      '#55efc4', psychological_health: '#74b9ff',
 };
 
 const DETAIL_GROUPS = [
@@ -142,6 +144,10 @@ const DETAIL_GROUPS = [
         ['prefrontal', 'prefrontal'],
         ['absorption', 'absorption'],
         ['shutdown',   'shutdown'  ],
+    ]},
+    { label: 'Health', rows: [
+        ['physical_health',      'physical'     ],
+        ['psychological_health', 'psychological'],
     ]},
 ];
 
@@ -196,12 +202,14 @@ function events_by_category() {
         const cat = event.category;
         if (!cats[cat]) cats[cat] = [];
         const reason = event.blocked_reason;
+        const noteFn = event.note;
         cats[cat].push({
             name,
             description:    event.description,
             duration:       event.duration,
             can_apply:      event.can_apply(_human),
             blocked_reason: typeof reason === 'function' ? reason(_human) : (reason || ''),
+            note:           typeof noteFn === 'function' ? noteFn(_human) : null,
         });
     }
     return cats;
@@ -220,6 +228,65 @@ function updateRecentActions(lastActions) {
         `<span class="recent-chip" onclick="applyAction('${a}')">${a.replace(/_/g, ' ')}</span>`
     ).join('');
     el.innerHTML = `<span class="recent-label">recent:</span>${chips}`;
+}
+
+// Color per notification type
+const NOTIF_COLORS = {
+    'orgasm':    '#fd79a8',
+    'overwhelm': '#fdcb6e',
+    'bad-trip':  '#d63031',
+    'sick':      '#55efc4',
+    'anxiety':   '#e17055',
+    'ssri':      '#74b9ff',
+    'ssri-stop': '#a29bfe',
+    'life-bad':  '#e17055',
+    'life-good': '#00b894',
+    'action':    'rgba(255,255,255,0.75)',
+};
+
+let _notifTimer = null;
+
+function showEventNotification(text, type) {
+    const el = $('event-notification');
+    if (!el) return;
+
+    // Clear any existing timer so previous message doesn't cut the new one short
+    if (_notifTimer) { clearTimeout(_notifTimer); _notifTimer = null; }
+
+    const color = NOTIF_COLORS[type] || 'rgba(255,255,255,0.9)';
+    el.innerHTML = `<div class="event-notif" style="--notif-color:${color}">${text}</div>`;
+
+    _notifTimer = setTimeout(() => {
+        el.innerHTML = '';
+        _notifTimer = null;
+    }, 3000);
+}
+
+// ── Action summary notification ────────────────────────────
+const _SUMMARY_VARS = [
+    'dopamine','serotonin','endorphins','oxytocin','prolactin','vasopressin',
+    'arousal','energy','sleepiness','hunger','anxiety','prefrontal','absorption',
+    'physical_health','psychological_health',
+];
+
+function buildActionSummary(before, after) {
+    const changes = _SUMMARY_VARS
+        .map(k => ({ k, d: Math.round((after[k] ?? 0) - (before[k] ?? 0)) }))
+        .filter(x => Math.abs(x.d) >= 3)
+        .sort((a, b) => Math.abs(b.d) - Math.abs(a.d))
+        .slice(0, 3);
+    if (!changes.length) return null;
+    return changes.map(x => `${x.k} ${x.d > 0 ? '+' : ''}${x.d}`).join('  ·  ');
+}
+
+// ── Death screen ───────────────────────────────────────────
+function checkDeath(state) {
+    if (state.physical_health <= 0 || state.psychological_health <= 0) {
+        const el = $('death-screen');
+        if (el) el.classList.remove('hidden');
+        return true;
+    }
+    return false;
 }
 
 function applyStateToUI(state, lastActions) {
@@ -264,6 +331,7 @@ function renderActionList(actions, showBack) {
             <div class="action-desc">${a.description}</div>
             <div class="action-dur">${a.duration}h</div>
             ${!a.can_apply && a.blocked_reason ? `<div class="action-blocked-reason">⚠ ${a.blocked_reason}</div>` : ''}
+            ${a.note ? `<div class="action-note">⚠ ${a.note}</div>` : ''}
         </div>`).join('');
     area.innerHTML = `${back}<div class="action-list">${items}</div>`;
 }
@@ -294,17 +362,30 @@ function applyAction(name) {
     const event = _events[name];
     if (!event || !event.can_apply(_human)) return;
 
+    const before = human_to_dict(_human);
     apply_event(_human, name, event);
+    const afterEvent = human_to_dict(_human);  // pre-decay snapshot for clean diff
     apply_decay(_human, event.duration);
     _human.clamp_values();
+
+    const notifications = drainNotifications();
+    if (notifications.length > 0) {
+        notifications.forEach(n => showEventNotification(n.text, n.type));
+    } else {
+        const msg = buildActionSummary(before, afterEvent);
+        if (msg) showEventNotification(msg, 'action');
+    }
 
     _lastActions.push(name);
     if (_lastActions.length > 20) _lastActions = _lastActions.slice(-20);
 
     allEvents = events_by_category();
-    applyStateToUI(human_to_dict(_human), _lastActions.slice(-3));
+    const finalState = human_to_dict(_human);
+    applyStateToUI(finalState, _lastActions.slice(-3));
     updateBackground(name);
     playSFX(name);
+
+    if (checkDeath(finalState)) return;
 
     // Re-render current view with updated can_apply
     const q = $('search-input').value.trim();
@@ -319,6 +400,11 @@ function applyAction(name) {
 
 // ── Reset ──────────────────────────────────────────────────────
 function resetGame() {
+    const death = $('death-screen');
+    if (death) death.classList.add('hidden');
+    if (_notifTimer) { clearTimeout(_notifTimer); _notifTimer = null; }
+    const notifEl = $('event-notification');
+    if (notifEl) notifEl.innerHTML = '';
     _human = create_human();
     _lastActions = [];
     allEvents = events_by_category();

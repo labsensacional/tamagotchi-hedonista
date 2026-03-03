@@ -11,6 +11,15 @@ export function getEnableProbabilistic() {
   return ENABLE_PROBABILISTIC;
 }
 
+// Pending notifications for UI — cleared each frame by drainNotifications()
+let _pendingNotifications = [];
+
+export function drainNotifications() {
+  const n = _pendingNotifications.slice();
+  _pendingNotifications = [];
+  return n;
+}
+
 // =============================================================================
 // BASELINE DECAY - Homeostasis
 // =============================================================================
@@ -477,8 +486,9 @@ export function apply_decay(human, dt) {
     human.absorption -= sleepy_absorb * 4 * dt;
   }
 
-  // Track time since orgasm
+  // Track time since orgasm / exercise
   human.time_since_orgasm += dt;
+  human.time_since_exercise += dt;
 
   // Edging buildup decays slowly
   human.edging_buildup *= (1 - 0.05 * dt);
@@ -641,6 +651,26 @@ export function apply_decay(human, dt) {
   if (human.endorphins > 80) {
     human.physical_health -= (human.endorphins - 80) * 0.08 * dt;
   }
+  // === E. Passive health regeneration ===
+  // Physical health recovers slowly when basic needs are met
+  if (human.hunger < 75 && human.energy > 20 && human.sleepiness < 75) {
+    const regen = 1.0 - (human.hunger / 75) * 0.3 - ((75 - human.energy) / 55) * 0.3;
+    human.physical_health += Math.max(0, regen) * dt;
+  }
+  // Psychological health recovers slowly when mind is calm
+  if (human.anxiety < 55 && human.shutdown < 35) {
+    const psych_regen = 0.8 * (1.0 - human.anxiety / 55 * 0.5);
+    human.psychological_health += Math.max(0, psych_regen) * dt;
+  }
+
+  // Starvation: extreme hunger damages physical health
+  if (human.hunger > 85) {
+    human.physical_health -= (human.hunger - 85) / 15 * 5 * dt;
+  }
+  // Sleep deprivation: extreme sleepiness damages physical health
+  if (human.sleepiness > 85) {
+    human.physical_health -= (human.sleepiness - 85) / 15 * 3 * dt;
+  }
 
   human.clamp_values();
 }
@@ -662,6 +692,7 @@ export class Event {
     this.can_apply = canApply;
     this.description = description;
     this.blocked_reason = blockedReason;
+    this.note = null; // optional (h) => string | null — shown as soft warning even when available
   }
 }
 
@@ -798,6 +829,7 @@ export function make_events() {
     // Probabilistic: premature orgasm at high arousal
     if (ENABLE_PROBABILISTIC && h.arousal > 70 && Math.random() < 0.08) {
       orgasm(h, eff);
+      _pendingNotifications.push({ text: 'unexpected release', type: 'orgasm' });
     }
   }
 
@@ -824,6 +856,7 @@ export function make_events() {
     // Probabilistic: lose control at very high arousal
     if (ENABLE_PROBABILISTIC && h.arousal > 80 && Math.random() < 0.12) {
       orgasm(h, eff);
+      _pendingNotifications.push({ text: "couldn't hold back", type: 'orgasm' });
     }
   }
 
@@ -892,6 +925,18 @@ export function make_events() {
     'Orgasm - character depends on vasopressin/oxytocin balance',
     (h) => h.prolactin >= 30 ? 'refractory period (prolactin high)' : 'need more arousal'
   );
+
+  // Sexual inhibition/SSRI notes — shown as soft warnings in the action list
+  const _sexualNote = (h) => {
+    const parts = [];
+    if (h.ssri_level > 20) parts.push(`SSRIs dulling arousal & dopamine response`);
+    if (h.sexual_inhibition > 40) parts.push(`inhibition dampening response`);
+    return parts.length ? parts.join(' · ') : null;
+  };
+  events['light_stimulation'].note  = _sexualNote;
+  events['intense_stimulation'].note = _sexualNote;
+  events['edging'].note             = _sexualNote;
+  events['orgasm'].note             = _sexualNote;
 
   // --- Pain/adrenaline (small doses enhance pleasure) ---
 
@@ -1087,6 +1132,7 @@ export function make_events() {
     if (ENABLE_PROBABILISTIC && Math.random() < 0.05) {
       h.anxiety += 30;
       h.physical_health -= 5;
+      _pendingNotifications.push({ text: 'too much, too fast', type: 'overwhelm' });
     }
   }
 
@@ -1133,6 +1179,7 @@ export function make_events() {
       h.anxiety += 40;
       h.absorption = 10;
       h.prefrontal += 20;
+      _pendingNotifications.push({ text: 'bad trip', type: 'bad-trip' });
     }
   }
 
@@ -1160,6 +1207,7 @@ export function make_events() {
       h.anxiety += 40;
       h.absorption = 10;
       h.prefrontal += 20;
+      _pendingNotifications.push({ text: 'bad trip', type: 'bad-trip' });
     }
   }
 
@@ -1263,6 +1311,7 @@ export function make_events() {
       h.hunger += 20;
       h.energy -= 10;
       h.digesting = 0;
+      _pendingNotifications.push({ text: 'sick...', type: 'sick' });
     }
   }
 
@@ -1307,6 +1356,7 @@ export function make_events() {
     // Probabilistic: anxiety spike
     if (ENABLE_PROBABILISTIC && Math.random() < 0.08) {
       h.anxiety += 35;
+      _pendingNotifications.push({ text: 'heart racing', type: 'anxiety' });
     }
   }
 
@@ -1345,6 +1395,7 @@ export function make_events() {
     h.serotonin += 3 * eff;
     h.anxiety += 5;  // early side effect: nausea
     h.ssri_level = Math.max(0.0, Math.min(100.0, h.ssri_level));
+    _pendingNotifications.push({ text: 'serotonin rising — dopamine & sexual response will be blunted', type: 'ssri' });
   }
 
   events['take_ssri'] = new Event(
@@ -1361,6 +1412,7 @@ export function make_events() {
     h.anxiety += 10;
     h.serotonin -= 5;
     h.ssri_level = Math.max(0.0, Math.min(100.0, h.ssri_level));
+    _pendingNotifications.push({ text: 'withdrawal — serotonin crashes, anxiety spikes', type: 'ssri-stop' });
   }
 
   events['stop_ssri'] = new Event(
@@ -1413,6 +1465,7 @@ export function make_events() {
     h.anxiety -= 10;
     h.prefrontal += 10;
     h.life_stress = Math.max(0.0, Math.min(100.0, h.life_stress));
+    _pendingNotifications.push({ text: 'prefrontal strengthening — anxiety baseline and life stress easing', type: 'life-good' });
   }
 
   events['therapy_session'] = new Event(
@@ -1424,6 +1477,34 @@ export function make_events() {
     'Therapy session'
   );
 
+  // --- Exercise ---
+
+  function exercise(h, eff = 1.0) {
+    h.energy -= 20;               // cost: not scaled — takes effort
+    h.hunger += 20;               // cost: burns calories
+    h.sleepiness += 10;           // cost: tires you out
+    h.physical_health += 8 * eff;
+    nt_boost(h, 'endorphins', 20 * eff);
+    nt_boost(h, 'dopamine', 10 * eff);
+    nt_boost(h, 'serotonin', 8 * eff);
+    h.anxiety -= 15 * eff;
+    h.arousal += 8 * eff;
+    h.time_since_exercise = 0;
+    _pendingNotifications.push({ text: 'endorphin rush — physical health improving', type: 'life-good' });
+  }
+
+  events['exercise'] = new Event(
+    'exercise',
+    1.0,
+    exercise,
+    'life',
+    (h) => h.energy > 25 && h.time_since_exercise >= 24,
+    'Exercise — endorphins, physical health boost (once per day)',
+    (h) => h.time_since_exercise < 24
+      ? `need to rest (${Math.ceil(24 - h.time_since_exercise)}h cooldown)`
+      : 'need more energy (costs 20)'
+  );
+
   // --- Life events ---
 
   function job_loss(h, eff = 1.0) {
@@ -1432,6 +1513,7 @@ export function make_events() {
     h.psychological_health -= 5;
     h.energy -= 10;
     h.life_stress = Math.max(0.0, Math.min(100.0, h.life_stress));
+    _pendingNotifications.push({ text: 'stress+25 — serotonin & dopamine baselines drop, libido suppressed', type: 'life-bad' });
   }
 
   events['job_loss'] = new Event(
@@ -1449,6 +1531,7 @@ export function make_events() {
     h.anxiety += 25;
     h.psychological_health -= 8;
     h.life_stress = Math.max(0.0, Math.min(100.0, h.life_stress));
+    _pendingNotifications.push({ text: 'stress+30 — chronic anxiety builds, hedonic capacity blunted', type: 'life-bad' });
   }
 
   events['financial_crisis'] = new Event(
@@ -1467,6 +1550,7 @@ export function make_events() {
     h.oxytocin -= 15;
     h.psychological_health -= 10;
     h.life_stress = Math.max(0.0, Math.min(100.0, h.life_stress));
+    _pendingNotifications.push({ text: 'oxytocin crashes — bonding circuits deprived, low mood incoming', type: 'life-bad' });
   }
 
   events['breakup'] = new Event(
@@ -1484,6 +1568,7 @@ export function make_events() {
     nt_boost(h, 'dopamine', 10 * eff);
     h.psychological_health += 3;
     h.life_stress = Math.max(0.0, Math.min(100.0, h.life_stress));
+    _pendingNotifications.push({ text: 'stress−20 — dopamine & serotonin baselines recovering', type: 'life-good' });
   }
 
   events['get_job'] = new Event(
@@ -1501,6 +1586,7 @@ export function make_events() {
     h.anxiety -= 8;
     h.psychological_health += 2;
     h.life_stress = Math.max(0.0, Math.min(100.0, h.life_stress));
+    _pendingNotifications.push({ text: 'stress−15 — chronic anxiety easing, energy floor rising', type: 'life-good' });
   }
 
   events['resolve_finances'] = new Event(
@@ -1520,6 +1606,7 @@ export function make_events() {
     h.anxiety -= 5;
     h.psychological_health += 5;
     h.life_stress = Math.max(0.0, Math.min(100.0, h.life_stress));
+    _pendingNotifications.push({ text: 'oxytocin & dopamine surge — bonding circuits activated', type: 'life-good' });
   }
 
   events['new_relationship'] = new Event(

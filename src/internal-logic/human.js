@@ -6,7 +6,8 @@
 export class Human {
   // Fields excluded from 0-100 clamping (unbounded or non-numeric)
   static _UNCLAMPED_FIELDS = new Set([
-    'time_since_orgasm',  // unbounded time counter
+    'time_since_orgasm',   // unbounded time counter
+    'time_since_exercise', // unbounded time counter
     'tolerance', 'reserves', 'cue_salience',  // dicts, clamped separately
     'active_effects', 'rebound_queue',  // lists, not clamped
     'ssri_level', 'life_stress',  // traits, not state
@@ -93,6 +94,7 @@ export class Human {
 
     // Internal state tracking
     this.time_since_orgasm = time_since_orgasm;
+    this.time_since_exercise = 999.0;  // starts available
     this.edging_buildup = edging_buildup;
     this.digesting = digesting;
 
