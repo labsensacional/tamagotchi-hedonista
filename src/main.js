@@ -12,6 +12,7 @@ let _events        = null;
 let _lastActions   = [];
 let allEvents      = {};        // { category: [{ name, description, duration, can_apply }] }
 let currentCategory = null;    // null = show category grid
+let _pinnedActions = [];        // action ids pinned via URL ?pinned= param
 let audioStarted   = false;
 let audioMuted     = false;
 
@@ -311,7 +312,7 @@ function renderCategories() {
             <span style="font-size:10px;color:rgba(255,255,255,0.35)">${available}/${acts.length}</span>
           </button>`;
     }).join('');
-    area.innerHTML = `<div class="category-grid">${cells}</div>`;
+    area.innerHTML = renderPinnedSection() + `<div class="category-grid">${cells}</div>`;
 }
 
 function selectCategory(cat) {
@@ -414,8 +415,33 @@ function resetGame() {
     renderCategories();
 }
 
+// ── Pinned actions section ─────────────────────────────────────
+function renderPinnedSection() {
+    if (!_pinnedActions.length) return '';
+    const allFlat = Object.values(allEvents).flat();
+    const items = _pinnedActions
+        .map(id => allFlat.find(a => a.name === id))
+        .filter(Boolean)
+        .map(a => `
+            <div class="action-item pinned ${a.can_apply ? '' : 'disabled'}"
+                 onclick="${a.can_apply ? `applyAction('${a.name}')` : ''}">
+                <div class="action-name">${a.name.replace(/_/g, ' ')}</div>
+                <div class="action-desc">${a.description}</div>
+                <div class="action-dur">${a.duration}h</div>
+                ${!a.can_apply && a.blocked_reason ? `<div class="action-blocked-reason">⚠ ${a.blocked_reason}</div>` : ''}
+            </div>`).join('');
+    return `<div class="pinned-header">📌 Sesión</div><div class="action-list pinned-list">${items}</div><hr class="pinned-divider">`;
+}
+
 // ── Init ───────────────────────────────────────────────────────
 function init() {
+    // Read pinned actions from URL ?pinned=action1,action2,...
+    const params = new URLSearchParams(window.location.search);
+    const pinnedParam = params.get('pinned');
+    if (pinnedParam) {
+        _pinnedActions = pinnedParam.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     _human = create_human();
     _events = make_events();
     _lastActions = [];

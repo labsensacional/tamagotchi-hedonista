@@ -546,3 +546,27 @@ html, body {
     -webkit-tap-highlight-color: transparent;
 }
 #audio-btn:active { background: rgba(255,255,255,0.1); }
+
+/* ── Pinned actions (from Laboratorio Sensacional) ── */
+.pinned-header {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: rgba(168,85,247,0.9);
+    text-transform: uppercase;
+    padding: 4px 2px 6px;
+}
+
+.pinned-list {
+    margin-bottom: 4px;
+}
+
+.action-item.pinned {
+    border-left: 2px solid rgba(168,85,247,0.6);
+}
+
+.pinned-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin: 8px 0 10px;
+}
